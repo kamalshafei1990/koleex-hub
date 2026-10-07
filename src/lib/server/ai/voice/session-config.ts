@@ -522,6 +522,20 @@ function voiceViewerBlock(viewer: VoiceViewer | null): string {
       : " What they may see is decided by their permissions on each lookup, not by anything said on the call.") +
     " Anything personal not listed here you do not know — ask rather than guess, and do not assume their gender:" +
     " address them by name." +
+    /* MEMORY ON THE CALL (owner, 2026-10-07): the text lanes recalled saved
+       facts and the call did not — a fact saved in chat was unknown on the
+       phone. Same facts, same switch, and the same proactive rule: a personal
+       fact said out loud is saved with remember_about_user the moment it is
+       said, without derailing the conversation. */
+    (() => {
+      const facts = Object.entries(viewer.memory ?? {});
+      const saved = facts.length
+        ? ` Things they asked you to remember: ${facts.map(([k, val]) => `${k}: ${val}`).join("; ")}.`
+        : "";
+      return saved +
+        " When they TELL you a personal fact about themselves (a name, a relative, a preference, a plan)," +
+        " call remember_about_user right away — without being asked and without stopping the call to announce it.";
+    })() +
     /* Their Settings → Koleex AI preferences, in the voice variant: style
        dials and a nickname, instructions cut to a call's budget, and no
        formatting or emoji dials — a voice has neither. Empty by default. */

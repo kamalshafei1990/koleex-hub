@@ -40,6 +40,10 @@ export type VoiceViewer = {
   isSuperAdmin: boolean;
   /** Their Settings → Koleex AI preferences; null in older fixtures. */
   personalization?: AiPersonalization | null;
+  /** Their saved memory facts (ai_memory, already filtered by the memory
+   *  switch). The text lanes inject these into every prompt; the call was
+   *  the one lane that forgot them — remembered on chat, unknown on a call. */
+  memory?: Record<string, string>;
   /** Their calendar timezone (IANA), so the call knows what day it is
    *  where they are. Absent in older fixtures: the default zone applies. */
   timezone?: string | null;
@@ -78,6 +82,7 @@ export async function authorizeVoice(req: Request): Promise<NextResponse | Voice
       department: ctx.viewer.department,
       isSuperAdmin: ctx.viewer.isSuperAdmin,
       personalization: ctx.personalization ?? null,
+      memory: ctx.memory ?? {},
       timezone: ctx.timezone ?? null,
     },
   };

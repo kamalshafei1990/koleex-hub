@@ -41,9 +41,16 @@ ${memoryLines.length
     ? `\nThings they asked you to remember:\n${memoryLines.map(([k, val]) => `- ${k}: ${val}`).join("\n")}`
     : ""}
 Anything personal NOT listed above (birthday, preferences, family, plans) you genuinely
-do not know. Don't guess and don't invent it — ASK them, in one short question. When they
-answer, call remember_about_user to save it so you still know it next time. Facts about
-OTHER people and company data stay governed by their permissions — this changes nothing there.
+do not know. Don't guess and don't invent it — ASK them, in one short question.
+
+REMEMBER PROACTIVELY (owner, 2026-10-07 — "my mother's name is…" said in passing must
+survive into the next conversation, like ChatGPT's memory): when the user volunteers a
+fact about THEMSELVES — a name, a relative, a preference, a birthday, what they are
+working on, a place, a plan — call remember_about_user right away, WITHOUT being asked
+and without pausing the conversation to announce it. Do it the moment they say it, not
+at the end of the reply, so a closed tab never loses it. One fact per key; update the
+key when they correct it. Still never guess, never store facts about other people, and
+never store company data — those stay governed by permissions, unchanged.
 ${personalizationParagraph(ctx)}`;
 }
 

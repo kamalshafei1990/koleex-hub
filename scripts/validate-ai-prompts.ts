@@ -151,6 +151,25 @@ check(
   "a non-empty memory DOES render the section (so the check above is not vacuous)",
   viewerBlockFor(ctx).includes("Things they asked you to remember:"),
 );
+/* Owner, 2026-10-07: "my mother's name is…" said in passing must survive into
+   the next conversation. The capture rule is proactive, and the CALL lane
+   must carry memory too — it was the one lane that forgot. */
+check(
+  "the viewer block orders PROACTIVE capture, not waiting to be asked",
+  viewerBlockFor(ctx).includes("REMEMBER PROACTIVELY"),
+);
+{
+  const voiceSrc = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+  const gateSrc = readFileSync("src/lib/server/ai/voice/gate.ts", "utf8");
+  check(
+    "the voice lane carries the saved facts and the proactive rule",
+    voiceSrc.includes("Things they asked you to remember:") && voiceSrc.includes("call remember_about_user right away"),
+  );
+  check(
+    "the voice gate passes the caller's memory from the same context the text lanes use",
+    gateSrc.includes("memory: ctx.memory") && gateSrc.includes("memory?: Record<string, string>"),
+  );
+}
 check("the now-block resolves in the user's timezone, not UTC", buildNowBlock("Asia/Dubai") !== buildNowBlock("America/New_York"));
 check("the now-block states a real year", /20\d\d/.test(buildNowBlock("Asia/Dubai")));
 
