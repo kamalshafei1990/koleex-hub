@@ -98,7 +98,14 @@ export default function MochiOrb({
     document.addEventListener("visibilitychange", onVis);
 
     const ctx = cv.getContext("2d")!;
-    let boost = 1.3;
+    /* The 1.3× boost exists for DISPLAY sizes — matching the aura orb's glow
+       footprint in the Home greeting and the Settings preview. At icon sizes
+       (<48px) the canvas shares a slot with line icons that occupy ~60-70% of
+       their box, so the boost reads as "the AI icon is bigger than the others"
+       (owner, 2026-10-07): there he draws at his natural lab size, slightly
+       tucked to match the line icons' visual weight. */
+    const baseBoost = size < 48 ? 0.92 : 1.3;
+    let boost = baseBoost;
     const frame = (nowMs: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (nowMs - last) / 1000);
@@ -107,15 +114,12 @@ export default function MochiOrb({
       engine.update(dt);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
-      /* Mochi's body spans ~68% of the canvas where the aura orb's glow fills
-         the frame — draw him ~30% larger so all three styles read at the same
-         visual size on every surface (Home greeting, Settings preview).
-         Except during the wave: the coucou hand sweeps out past the body, so
+      /* Except during the wave: the coucou hand sweeps out past the body, so
          the boost eases down to fit it inside the frame instead of cropping
          it (owner, 2026-10-06). */
       const n = nowMs / 1000;
       const waving = n > engine.waveStart - 0.2 && n < engine.waveUntil + 0.4;
-      const boostTarget = waving ? 1.0 : 1.3;
+      const boostTarget = waving ? Math.min(1.0, baseBoost) : baseBoost;
       boost += (boostTarget - boost) * Math.min(1, dt * 6);
       ctx.translate(size / 2, size / 2);
       ctx.scale(boost, boost);
