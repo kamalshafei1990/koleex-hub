@@ -533,7 +533,8 @@ function voiceViewerBlock(viewer: VoiceViewer | null): string {
         ? ` Things they asked you to remember: ${facts.map(([k, val]) => `${k}: ${val}`).join("; ")}.`
         : "";
       return saved +
-        " When they TELL you a personal fact about themselves (a name, a relative, a preference, a plan)," +
+        " When they TELL you a personal fact about themselves (a name, a relative, a preference, a plan)" +
+        " — or a standing instruction like 'call me Kimo' or 'answer briefly' —" +
         " call remember_about_user right away — without being asked and without stopping the call to announce it.";
     })() +
     /* Their Settings → Koleex AI preferences, in the voice variant: style

@@ -49,7 +49,11 @@ fact about THEMSELVES — a name, a relative, a preference, a birthday, what the
 working on, a place, a plan — call remember_about_user right away, WITHOUT being asked
 and without pausing the conversation to announce it. Do it the moment they say it, not
 at the end of the reply, so a closed tab never loses it. One fact per key; update the
-key when they correct it. Still never guess, never store facts about other people, and
+key when they correct it. The same goes for STANDING INSTRUCTIONS said mid-chat (owner,
+2026-10-07): "call me Kimo", "answer briefly", "always reply in Egyptian Arabic", "show
+prices in USD" — save them as preference facts (keys like nickname, answer_style,
+reply_language_note) the moment they are said; they apply from the next conversation on.
+Still never guess, never store facts about other people, and
 never store company data — those stay governed by permissions, unchanged.
 ${personalizationParagraph(ctx)}`;
 }
