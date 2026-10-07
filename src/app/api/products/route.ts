@@ -220,6 +220,12 @@ export async function GET(req: Request) {
       counts: Record<string, number>;
       primaryModelNames: Record<string, string>;
       modelNames: Record<string, string[]>;
+      /* Supplier-model codes — search reach only, NEVER displayed (the card
+         chips keep showing Koleex codes; the "rules must match signals"
+         comment above guards the display lists, not this one). Owner,
+         2026-10-07: typing the supplier's own model code must find the
+         product while still typing, not one server round trip later. */
+      searchModels: Record<string, string[]>;
     } | undefined;
     if (modelsPromise) {
       const { data: mRows, error: mErr } = await modelsPromise;
@@ -227,6 +233,7 @@ export async function GET(req: Request) {
       const counts: Record<string, number> = {};
       const names: Record<string, string[]> = {};
       const primary: Record<string, string> = {};
+      const searchNames: Record<string, string[]> = {};
       /* THESE RULES MUST MATCH /api/products/signals EXACTLY. Both feed the
          same card, so any difference shows up as the card visibly correcting
          itself a second after it painted — the first version of this used
@@ -246,8 +253,15 @@ export async function GET(req: Request) {
           const list = (names[raw.product_id] ??= []);
           if (!list.includes(label)) list.push(label);
         }
+        /* the supplier's own designation joins the search roster when it
+           differs from the Koleex code */
+        const sup = raw.model_name?.trim();
+        if (sup && sup !== label) {
+          const sl = (searchNames[raw.product_id] ??= []);
+          if (!sl.includes(sup)) sl.push(sup);
+        }
       }
-      models = { counts, primaryModelNames: primary, modelNames: names };
+      models = { counts, primaryModelNames: primary, modelNames: names, searchModels: searchNames };
     }
     _t.mark("models");
 

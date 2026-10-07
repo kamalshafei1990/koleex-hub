@@ -1066,6 +1066,9 @@ export default function ProductList() {
      lets search find a member code that is NOT the primary (the "XF-600
      lives inside XF-450" problem). */
   const [modelNames, setModelNames] = useState<Record<string, string[]>>(() => readModelCache(currentScopeKey())?.modelNames ?? {});
+  /* Supplier-model codes per product — search-only (never rendered; the card
+     chips stay Koleex codes). */
+  const [searchModelNames, setSearchModelNames] = useState<Record<string, string[]>>({});
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
@@ -1296,9 +1299,11 @@ export default function ProductList() {
 
      300ms: long enough that a normal typist sends ONE request per word, short
      enough that it never feels like a lag after they stop. The local filter
-     below still narrows the grid on `deferredSearch` — i.e. instantly, on the
-     rows already loaded — so the screen reacts on the keystroke and the
-     server merely confirms it. */
+     below narrows the grid on `search` itself — the typed value, same frame
+     (owner, 2026-10-07: "I want to see the suggested products while I'm still
+     typing") — the haystack is precomputed, so a keystroke costs a filter
+     over short strings, not a render storm. The deferred value stays for
+     what it's for: the server search trigger and the persisted filter. */
   const [searchForServer, setSearchForServer] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setSearchForServer(search), 300);
@@ -1478,7 +1483,7 @@ export default function ProductList() {
           markCatalogueFetched();
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
-            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]>; searchModels?: Record<string, string[]> };
             groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; facets?: { categories: Record<string, number>; subcategories: Record<string, number> }; capped: boolean };
           };
           p = json.rows ?? [];
@@ -1495,6 +1500,7 @@ export default function ProductList() {
             setModelCounts(json.models.counts);
             setPrimaryModelNames(json.models.primaryModelNames);
             setModelNames(json.models.modelNames);
+            if (json.models.searchModels) setSearchModelNames(json.models.searchModels);
             setModelsReady(true);
           }
           pageRef.current = 1;
@@ -1991,7 +1997,7 @@ export default function ProductList() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return (await res.json()) as {
             rows?: ProductRow[]; hasMore?: boolean;
-            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]>; searchModels?: Record<string, string[]> };
           };
         } catch {
           /* One failed page must not blank the grid, and must not strand the
@@ -2369,14 +2375,17 @@ export default function ProductList() {
         /* Supplier names from the model rows — "yili" now finds every
            product that supplier makes. */
         (productSuppliers[p.id] || []).join(" ").toLowerCase(),
+        /* The supplier's OWN model code (owner, 2026-10-07) — "A7" from the
+           supplier's catalog finds the Koleex product while still typing. */
+        (searchModelNames[p.id] || []).join(" ").toLowerCase(),
         (supplierAlt[p.id] || "").toLowerCase(),
       ].join(" ");
       /* Squashed twin: codes and names with all separators dropped, so any
          separator style the operator types still hits. */
-      map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "")) };
+      map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "") + " " + (searchModelNames[p.id] || []).join(" ")) };
     }
     return map;
-  }, [products, primaryModelNames, modelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt]);
+  }, [products, primaryModelNames, modelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt, searchModelNames]);
 
   /* Typeahead suggestions built from the typed query.
        · Categories  → click sets the category filter
@@ -2569,7 +2578,7 @@ export default function ProductList() {
   };
 
   const filtered = useMemo(() => {
-    const q = deferredSearch.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
     const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     return products.filter(p => {
       /* /products is the customer-facing catalogue: only ACTIVE products
@@ -2614,7 +2623,7 @@ export default function ProductList() {
       }
       return true;
     });
-  }, [products, isInternal, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, serverSearchActive, productSuppliers, searchHaystack]);
+  }, [products, isInternal, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, serverSearchActive, productSuppliers, searchHaystack]);
 
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
