@@ -52,6 +52,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .order("scope");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  /* Names ride along — two batched lookups for the whole sheet, never one
+     per row (China latency rule: one request per screen). */
+  const skillRefs = [...new Set((items ?? []).filter((i) => i.item_kind === "skill").map((i) => i.ref_id))];
+  const behaviorRefs = [...new Set((items ?? []).filter((i) => i.item_kind === "behavior").map((i) => i.ref_id))];
+  const [{ data: skillRows }, { data: behaviorRows }] = await Promise.all([
+    skillRefs.length
+      ? supabaseServer.from("skills").select("id, name, name_zh, name_ar").in("id", skillRefs)
+      : Promise.resolve({ data: [] }),
+    behaviorRefs.length
+      ? supabaseServer.from("behavior_indicators").select("id, name, name_zh, name_ar").in("id", behaviorRefs)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const nameOf = new Map<string, { name: string; name_zh: string | null; name_ar: string | null }>();
+  for (const r of skillRows ?? []) nameOf.set(r.id, r);
+  for (const r of behaviorRows ?? []) nameOf.set(r.id, r);
+
   const byEmployee = new Map<string, { total: number; scored: number; missingMandatory: number }>();
   for (const it of items ?? []) {
     const agg = byEmployee.get(it.employee_id) ?? { total: 0, scored: 0, missingMandatory: 0 };
@@ -63,7 +79,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({
     cycle,
-    items: items ?? [],
+    items: (items ?? []).map((it) => ({ ...it, ...(nameOf.get(it.ref_id) ?? { name: "?", name_zh: null, name_ar: null }) })),
     progress: Object.fromEntries(byEmployee),
   });
 }

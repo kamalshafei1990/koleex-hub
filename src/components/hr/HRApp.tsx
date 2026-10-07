@@ -20,6 +20,7 @@ import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
@@ -46,6 +47,7 @@ const HR_MODULE_LOADERS = {
   attendance:  () => import("./modules/Attendance"),
   recruitment: () => import("./modules/Recruitment"),
   appraisals:  () => import("./modules/Appraisals"),
+  ratings:     () => import("./modules/Ratings"),
   skills:      () => import("./modules/Skills"),
   behavior:    () => import("./modules/Behavior"),
   onboarding:  () => import("./modules/Onboarding"),
@@ -59,6 +61,7 @@ const LeaveModule       = dynamic(HR_MODULE_LOADERS.leave,       { ssr: false, l
 const AttendanceModule  = dynamic(HR_MODULE_LOADERS.attendance,  { ssr: false, loading: moduleLoading });
 const RecruitmentModule = dynamic(HR_MODULE_LOADERS.recruitment, { ssr: false, loading: moduleLoading });
 const AppraisalsModule  = dynamic(HR_MODULE_LOADERS.appraisals,  { ssr: false, loading: moduleLoading });
+const RatingsModule     = dynamic(HR_MODULE_LOADERS.ratings,     { ssr: false, loading: moduleLoading });
 const SkillsModule      = dynamic(HR_MODULE_LOADERS.skills,      { ssr: false, loading: moduleLoading });
 const BehaviorModule    = dynamic(HR_MODULE_LOADERS.behavior,    { ssr: false, loading: moduleLoading });
 const OnboardingModule  = dynamic(HR_MODULE_LOADERS.onboarding,  { ssr: false, loading: moduleLoading });
@@ -74,6 +77,7 @@ const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string
   attendance:  ClockIcon,
   recruitment: UserPlusIcon,
   appraisals:  StarIcon,
+  ratings:     AwardIcon,
   skills:      SparklesIcon,
   behavior:    ShieldIcon,
   onboarding:  CheckCircleIcon,
@@ -109,6 +113,7 @@ const MODULE_MAP: Record<TabId, ComponentType<HRModuleProps>> = {
   attendance:  AttendanceModule,
   recruitment: RecruitmentModule,
   appraisals:  AppraisalsModule,
+  ratings:     RatingsModule,
   skills:      SkillsModule,
   behavior:    BehaviorModule,
   onboarding:  OnboardingModule,
