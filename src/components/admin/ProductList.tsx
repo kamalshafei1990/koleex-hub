@@ -2464,7 +2464,9 @@ export default function ProductList() {
         categorySlug: categories.find(c => c.id === s.category_id)?.slug || "",
         label: s.name,
         count: subcategoryProductCounts[s.slug] || 0,
-      }));
+      }))
+      /* A zero-count suggestion is noise — nothing loaded matches it. */
+      .filter((s) => s.count > 0);
 
     const brands = allBrands
       .map(b => ({ b, score: prefixThenContains(b, q) }))
