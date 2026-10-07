@@ -42,7 +42,9 @@ check("app-chunk-preload never touches /api (chunk warm only)", !/\/api\//.test(
 check("preloadAppChunk is deduped", /warmed\.has\(appId\)/.test(chunk) && /warmed\.add\(appId\)/.test(chunk));
 
 // ── (C) AppLaunchLink warms real chunk on intent + cold tag ──
-check("AppLaunchLink warms the real chunk on intent", /preloadAppChunk\(app\.id\)/.test(link));
+/* the call gained a { force } option when intent-warming stopped sharing
+   the idle gate — the pin is the call, not the argument list */
+check("AppLaunchLink warms the real chunk on intent", /preloadAppChunk\(app\.id/.test(link));
 check("AppLaunchLink keeps native <Link> (modifier/middle/keyboard)", /<Link/.test(link) && /metaKey \|\| e\.ctrlKey/.test(link));
 check("AppLaunchLink keeps CSS :active press feedback (no JS wait)", /active:scale-\[0\.97\]/.test(link));
 check("AppLaunchLink tags cold launches", /markAppLaunch\(app\.id, pressMs, !wasChunkWarmed\(app\.id\)\)/.test(link));

@@ -76,6 +76,11 @@ export class MochiBehaviorDirector {
   private audioLevel = 0;
   private detachFns: Array<() => void> = [];
   private getOrbCenter: (() => { x: number; y: number } | null) | null = null;
+  /* The orb's screen rect is cached and invalidated by scroll/resize only —
+     reading it on every pointermove (getBoundingClientRect forces layout)
+     once per mounted orb made the whole page judder under the mouse
+     (owner, 2026-10-07: "the system became slow"). */
+  private orbCenterCache: { x: number; y: number; at: number } | null = null;
   private ambientNextAt = Date.now() + 8_000;
   private gazeDriftNextAt = Date.now() + 4_000;
   private rareLastAt: Record<string, number> = {};
@@ -126,7 +131,14 @@ export class MochiBehaviorDirector {
       /* The gaze follows the pointer — eyes and a leaning head, through the
          engine's lookX/lookY. Sleeping and dizzy states override it inside
          the engine, so there is nothing to gate here. */
-      const c = this.getOrbCenter?.();
+      let c: { x: number; y: number } | null = null;
+      if (this.orbCenterCache && Date.now() - this.orbCenterCache.at < 500) {
+        c = { x: this.orbCenterCache.x, y: this.orbCenterCache.y };
+      } else {
+        const r = this.getOrbCenter?.() ?? null;
+        if (r) this.orbCenterCache = { ...r, at: Date.now() };
+        c = r;
+      }
       if (!c) return;
       const gx = (e.clientX - c.x) / (window.innerWidth * 0.5);
       const gy = (e.clientY - c.y) / (window.innerHeight * 0.5);
@@ -138,6 +150,15 @@ export class MochiBehaviorDirector {
       this.engine.lookX = lx;
       this.engine.lookY = ly;
     };
+    /* scroll or resize moves the orb on screen — drop the cached rect */
+    const invalidate = () => { this.orbCenterCache = null; };
+    window.addEventListener("scroll", invalidate, { passive: true, capture: true });
+    window.addEventListener("resize", invalidate, { passive: true });
+    this.detachFns.push(() => {
+      window.removeEventListener("scroll", invalidate, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", invalidate);
+    });
+
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onMove, { passive: true });
     this.detachFns.push(() => {
