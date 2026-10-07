@@ -249,7 +249,7 @@ export default function RatingsModule({ employees, t, lang }: HRModuleProps) {
               )}
             </div>
           </div>
-          {error && <p data-kx-keep-hover className="px-5 py-2 text-[12px] text-red-400 border-b border-[var(--border-faint)]">{error}</p>}
+          {error && <p className="px-5 py-2 text-[12px] text-red-400">{error}</p>}
 
           {/* Phase 4: the calibration overview — only once the cycle leaves
               scoring (the sheet itself answers everything before that). */}
