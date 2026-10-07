@@ -55,6 +55,7 @@ interface LinkRow {
   unit_cost_cny: number | string | null;
   notes?: string | null;
   price_options?: Array<{ price?: unknown; note?: unknown }> | null;
+  supplier_product_code?: string | null;
 }
 
 interface ContactRow {
@@ -134,6 +135,7 @@ export interface ProductSignalsPayload {
   allSuppliers: string[];
   nameAlts: Record<string, string>;
   mainImages: Record<string, string>;
+  supplierCodes: Record<string, string[]>;
   costVisible: boolean;
 }
 
@@ -145,7 +147,7 @@ export async function computeProductSignals(
 ): Promise<ProductSignalsPayload | null> {
   const ids = Array.from(new Set(idsIn)).slice(0, MAX_IDS);
 
-  const empty = { signals: {}, suppliers: {}, allSuppliers: [] as string[], nameAlts: {}, mainImages: {}, costVisible: canSeeCosts };
+  const empty = { signals: {}, suppliers: {}, allSuppliers: [] as string[], nameAlts: {}, mainImages: {}, supplierCodes: {} as Record<string, string[]>, costVisible: canSeeCosts };
   if (ids.length === 0) return empty as ProductSignalsPayload;
 
   /* Every per-product read is scoped to the posted ids and goes through
@@ -178,7 +180,7 @@ export async function computeProductSignals(
     inChunks<LinkRow>(ids, (chunk) =>
       supabaseServer
         .from("product_suppliers")
-        .select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options")
+        .select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options, supplier_product_code")
         .in("product_id", chunk)),
     inChunks<{ product_id: string; product_name: string | null }>(ids, (chunk) =>
       supabaseServer.from("product_translations").select("product_id, product_name").in("product_id", chunk)),
@@ -217,6 +219,11 @@ export async function computeProductSignals(
   const linkNote = new Map<string, string>();
   const linkExtras = new Map<string, { price: number | null; note: string }[]>();
   const linkedSupplier = new Map<string, string>();
+  /* The supplier's OWN model code per product (product_suppliers.
+     supplier_product_code — "A8-160S"). Owner, 2026-10-08: searching it must
+     narrow the grid on the keystroke, so it rides the payload like the names
+     do. Never rendered on cards — search reach only. */
+  const supplierCodes: Record<string, string[]> = {};
   for (const l of (linkRes.data ?? []) as LinkRow[]) {
     const c = l.unit_cost_cny == null || l.unit_cost_cny === "" ? null : Number(l.unit_cost_cny);
     if (c != null && Number.isFinite(c) && (l.is_primary || !linkCost.has(l.product_id))) {
@@ -230,6 +237,11 @@ export async function computeProductSignals(
           note: String(o.note ?? "").trim(),
         })).filter((o) => o.price !== null || o.note));
       }
+    }
+    const code = (l.supplier_product_code ?? "").trim();
+    if (code) {
+      const list = (supplierCodes[l.product_id] ??= []);
+      if (!list.includes(code)) list.push(code);
     }
     if (!l.supplier_id) continue;
     if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
@@ -383,5 +395,5 @@ export async function computeProductSignals(
      be: signals move at data-entry speed, and the page-level warm start
      (thumbnails in localStorage) already covers the repeat open. */
 
-  return { signals, suppliers, allSuppliers, nameAlts, mainImages, costVisible: canSeeCosts };
+  return { signals, suppliers, allSuppliers, nameAlts, mainImages, supplierCodes, costVisible: canSeeCosts };
 }

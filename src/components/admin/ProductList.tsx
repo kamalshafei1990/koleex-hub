@@ -1069,6 +1069,9 @@ export default function ProductList() {
   /* Supplier-model codes per product — search-only (never rendered; the card
      chips stay Koleex codes). */
   const [searchModelNames, setSearchModelNames] = useState<Record<string, string[]>>({});
+  /* The supplier's own model codes per product (product_suppliers.
+     supplier_product_code) — search reach only, from the signals bundle. */
+  const [supplierModelCodes, setSupplierModelCodes] = useState<Record<string, string[]>>({});
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
@@ -1708,6 +1711,7 @@ export default function ProductList() {
       allSuppliers?: string[];
       nameAlts?: Record<string, string>;
       mainImages?: Record<string, string>;
+      supplierCodes?: Record<string, string[]>;
     };
     /* One merge for both doors: the embedded bundle and the POST answer are
        the same payload shape, from the same server function. */
@@ -1742,6 +1746,7 @@ export default function ProductList() {
         setSupplierAlt((prev) => ({ ...prev, ...nextAlt }));
         setSupplierLogos((prev) => ({ ...prev, ...nextLogos }));
         if (j.nameAlts) setNameAlts((prev) => ({ ...prev, ...j.nameAlts }));
+        if (j.supplierCodes) setSupplierModelCodes((prev) => ({ ...prev, ...j.supplierCodes }));
         if (j.allSuppliers?.length) setAllSuppliers((prev) => Array.from(new Set([...prev, ...j.allSuppliers!])).sort());
         if (j.mainImages) applyImgs(j.mainImages);
         /* The supplier answer has arrived — cards may now state it,
@@ -2378,14 +2383,15 @@ export default function ProductList() {
         /* The supplier's OWN model code (owner, 2026-10-07) — "A7" from the
            supplier's catalog finds the Koleex product while still typing. */
         (searchModelNames[p.id] || []).join(" ").toLowerCase(),
+        (supplierModelCodes[p.id] || []).join(" ").toLowerCase(),
         (supplierAlt[p.id] || "").toLowerCase(),
       ].join(" ");
       /* Squashed twin: codes and names with all separators dropped, so any
          separator style the operator types still hits. */
-      map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "") + " " + (searchModelNames[p.id] || []).join(" ")) };
+      map[p.id] = { hay, sq: squash(p.product_name + " " + mn + " " + (p.slug || "") + " " + (searchModelNames[p.id] || []).join(" ") + " " + (supplierModelCodes[p.id] || []).join(" ")) };
     }
     return map;
-  }, [products, primaryModelNames, modelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt, searchModelNames]);
+  }, [products, primaryModelNames, modelNames, divNameBySlug, catNameBySlug, subNameBySlug, triTaxonomyBySlug, productSuppliers, nameAlts, supplierAlt, searchModelNames, supplierModelCodes]);
 
   /* Typeahead suggestions built from the typed query.
        · Categories  → click sets the category filter
