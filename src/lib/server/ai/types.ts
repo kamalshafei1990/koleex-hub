@@ -57,7 +57,7 @@ export interface AiContext {
     role?: string | null;
     department?: string | null;
   } | null;
-  /** Facts the user asked the assistant to remember (accounts.preferences.ai_memory). */
+  /** Facts the user asked the assistant to remember (the ai_memories table since 2026-10-07). */
   memory?: Record<string, string> | null;
   /** How this user asked to be spoken to (accounts.preferences.ai). Tone,
    *  format and personal context only — see ai/personalization-prompt.ts. */

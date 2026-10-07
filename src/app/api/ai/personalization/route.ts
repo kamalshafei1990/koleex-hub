@@ -15,10 +15,13 @@ import "server-only";
    (view-as is read-only by design) and may not write — the same rule the
    memory tools apply.
 
-   ONE ATOMIC MERGE. Writes go through mergeAccountPrefs, the single
-   statement that closed finding N12, touching only the `ai` and
-   `ai_memory` keys, so a fact the assistant stores mid-edit is not erased
-   by a Settings save landing a second later.
+   ONE ATOMIC MERGE. Personalization writes go through mergeAccountPrefs,
+   the single statement that closed finding N12, touching only the `ai` key.
+
+   2026-10-07: memory facts moved to the ai_memories table (one row per
+   fact, atomic upserts). GET reads them from there; forget/forgetAll delete
+   rows there. The merge below never touches ai_memory anymore, so a Settings
+   save and an assistant save cannot collide at all.
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -26,21 +29,11 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
+import { readMemories, forgetFact, forgetAllFacts } from "@/lib/server/ai/user-memory-store";
 import { readPersonalization } from "@/lib/server/ai/personalization-prompt";
 import { patchAiPersonalization, type AiPersonalization } from "@/lib/ai-personalization";
 
 export const dynamic = "force-dynamic";
-
-/** Only well-formed string facts, the same filter every prompt lane applies. */
-function factsOf(prefs: Record<string, unknown>): Record<string, string> {
-  const out: Record<string, string> = {};
-  const raw = prefs.ai_memory;
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof v === "string" && k.length <= 40 && v.length <= 200) out[k] = v;
-  }
-  return out;
-}
 
 async function loadPrefs(accountId: string): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabaseServer
@@ -66,7 +59,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     personalization: readPersonalization(prefs),
-    memory: factsOf(prefs),
+    memory: await readMemories(auth.account_id),
   });
 }
 
@@ -108,18 +101,19 @@ export async function PUT(req: Request) {
     patch.ai = personalization;
   }
 
-  let memory = factsOf(prefs);
+  /* Facts are rows now — a delete touches only the row it names, and a
+     Settings save can never erase a fact the assistant stored mid-edit
+     (the old ai_memory replace could, in the same second). */
   if (body.forgetAll === true) {
-    memory = {};
-    patch.ai_memory = memory;
+    if (!(await forgetAllFacts(auth.account_id))) {
+      return NextResponse.json({ error: "Could not save." }, { status: 500 });
+    }
   } else if (Array.isArray(body.forget) && body.forget.length > 0) {
-    const next = { ...memory };
-    for (const k of body.forget) if (typeof k === "string") delete next[k];
-    memory = next;
-    /* A SMALLER object replaces the old one — the merge is shallow on
-       purpose (account-prefs.ts), which is what makes deletion possible. */
-    patch.ai_memory = memory;
+    for (const k of body.forget) {
+      if (typeof k === "string") await forgetFact(auth.account_id, k);
+    }
   }
+  const memory = await readMemories(auth.account_id);
 
   if (Object.keys(patch).length > 0) {
     const merged = await mergeAccountPrefs(auth.account_id, patch);

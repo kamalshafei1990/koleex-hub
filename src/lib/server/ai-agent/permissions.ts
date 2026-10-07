@@ -93,7 +93,7 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   const canViewPrivate = auth.can_view_private === true || superAdmin;
 
   // Load everything this user is allowed to see, one DB round-trip each.
-  const [rolePermsRes, overridesRes, prefsRes] = await Promise.all([
+  const [rolePermsRes, overridesRes, prefsRes, memoryRes] = await Promise.all([
     auth.role_id
       ? supabaseServer
           .from("koleex_permissions")
@@ -115,6 +115,14 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
       .select("preferences, username, person:person_id(full_name, name_alt), role:role_id(name)")
       .eq("id", auth.account_id)
       .maybeSingle(),
+    /* The remembered facts, one row each — parallel with the rest, so the
+       table read adds no wall time to a turn (owner's standing rule: memory
+       must never slow the reply). */
+    supabaseServer
+      .from("ai_memories")
+      .select("key, value")
+      .eq("account_id", auth.account_id)
+      .order("created_at", { ascending: true }),
   ]);
 
   const prefs = (prefsRes.data?.preferences ?? {}) as {
@@ -143,11 +151,14 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     isSuperAdmin: superAdmin,
   };
 
-  /* Only well-formed string facts — never let arbitrary JSON reach the prompt. */
+  /* Only well-formed string facts — never let arbitrary JSON reach the prompt.
+     Facts live in ai_memories since 2026-10-07 (the JSON ai_memory was
+     read-modify-write; the migration carried its facts over). */
   const facts: Record<string, string> = {};
-  for (const [k, v] of Object.entries(prefs.ai_memory ?? {})) {
-    if (typeof k === "string" && typeof v === "string" && k.length <= 40 && v.length <= 200) {
-      facts[k] = v;
+  for (const row of (memoryRes.data ?? []) as Array<{ key: unknown; value: unknown }>) {
+    if (typeof row.key === "string" && typeof row.value === "string" &&
+        row.key.length <= 40 && row.value.length <= 200) {
+      facts[row.key] = row.value;
     }
   }
   /* And none of them when the user turned memory off in Settings. */

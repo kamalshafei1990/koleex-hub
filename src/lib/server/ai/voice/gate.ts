@@ -40,7 +40,7 @@ export type VoiceViewer = {
   isSuperAdmin: boolean;
   /** Their Settings → Koleex AI preferences; null in older fixtures. */
   personalization?: AiPersonalization | null;
-  /** Their saved memory facts (ai_memory, already filtered by the memory
+  /** Their saved memory facts (ai_memories, already filtered by the memory
    *  switch). The text lanes inject these into every prompt; the call was
    *  the one lane that forgot them — remembered on chat, unknown on a call. */
   memory?: Record<string, string>;

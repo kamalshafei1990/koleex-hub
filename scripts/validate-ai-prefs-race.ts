@@ -114,16 +114,21 @@ const REMAINING_DIRECT_WRITERS = [
   "src/lib/server/ai/security/account-prefs.ts",
 ] as const;
 
-console.log("\n── 1. The two AI writers go through the atomic merge ──");
+console.log("\n── 1. The two AI writers never touch the preferences document directly ──");
 {
   const memory = strip(readFileSync("src/lib/server/ai-agent/tools/user-memory.ts", "utf8"));
   const language = strip(readFileSync("src/lib/server/ai/reply-language.ts", "utf8"));
 
-  check("remember/forget write through mergeAccountPrefs", /mergeAccountPrefs\(/.test(memory));
+  /* 2026-10-07: memory LEFT the preferences column entirely — facts live in
+     the ai_memories table with atomic upserts, which closes the concurrent-
+     remembers race the JSON cap could not. The strongest form of the old
+     check is now "it does not touch preferences at all". */
+  check("remember/forget write through the ai_memories store", /rememberFact\(|forgetFact\(/.test(memory));
   check("setReplyLanguage writes through mergeAccountPrefs", /mergeAccountPrefs\(/.test(language));
   check(
     "and NEITHER writes the preferences column directly any more",
-    !/update\(\{\s*preferences/.test(memory) && !/update\(\{\s*preferences/.test(language),
+    !/update\(\{\s*preferences/.test(memory) && !/update\(\{\s*preferences/.test(language) &&
+    !/mergeAccountPrefs\(/.test(memory),
   );
   /* The scenario from the header, gone: the un-awaited language write can
      still run concurrently — that is a latency decision, not a bug — but it no
@@ -206,13 +211,22 @@ console.log("\n── 2. No NEW direct writer may be added ──");
 
 console.log("\n── 3. The memory cap still behaves, whatever the storage ──");
 {
-  /* Independent of the race: the 25-fact cap drops OLDEST-first, which relies
-     on JSON insertion order. Worth pinning because a move to a table would
-     change how "oldest" is determined, and silently keeping the wrong 25 is
-     a data-loss bug that looks like nothing. */
+  /* 2026-10-07: the store is the ai_memories table. The cap moved into one
+     SQL statement (ai_memories_cap) that keeps the NEWEST rows by
+     created_at — the JSON version relied on insertion order, and a move to
+     a table keeping the wrong 25 is a data-loss bug that looks like
+     nothing, so pin the ORDER BY explicitly. */
+  const store = strip(readFileSync("src/lib/server/ai/user-memory-store.ts", "utf8"));
+  const migration = readFileSync("supabase/migrations/20261007_ai_memories.sql", "utf8");
+  check("the fact store is capped", /MEMORY_MAX_FACTS/.test(store) && /ai_memories_cap/.test(store));
+  check("the cap drops the OLDEST facts, not the newest",
+    /ORDER BY created_at DESC\s*LIMIT p_keep/.test(migration) && /NOT IN/.test(migration));
+  check("the cap function is service-role only",
+    /REVOKE ALL ON FUNCTION public\.ai_memories_cap/.test(migration));
+  check("facts upsert atomically — no read-modify-write",
+    /\.upsert\(/.test(store) && /onConflict: "account_id,key"/.test(store));
+
   const mem = strip(readFileSync("src/lib/server/ai-agent/tools/user-memory.ts", "utf8"));
-  check("the fact store is capped", /MAX_FACTS/.test(mem));
-  check("the cap drops the OLDEST keys, not the newest", /keys\.slice\(0, keys\.length - MAX_FACTS\)/.test(mem));
   check(
     "memory writes are refused while viewing as another user",
     /viewing_as/.test(mem),

@@ -76,7 +76,7 @@ export interface UserContext {
     isSuperAdmin: boolean;
   };
   /* Facts the user asked the agent to remember, stored per account in
-     accounts.preferences.ai_memory (no new table). Key → value, e.g.
+     the ai_memories table (one row per fact since 2026-10-07). Key → value, e.g.
      { birthday: "3 March", prefers: "short answers" }. */
   memory: Record<string, string>;
   /* How this user asked to be spoken to — accounts.preferences.ai, read by

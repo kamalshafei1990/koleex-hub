@@ -7,22 +7,27 @@ import "server-only";
    Scope, deliberately narrow:
      · facts the signed-in user volunteers ABOUT THEMSELVES (birthday,
        how they like answers, what they are working on);
-     · stored on their OWN account row, in preferences.ai_memory;
+     · stored on their OWN account, one row per fact in ai_memories;
      · never about anyone else, and never company data — those stay behind
        the permission layer, unchanged by this file.
 
-   Stored in the existing accounts.preferences JSONB rather than a new
-   table: it is per-account by definition, tiny, and needs no migration.
+   2026-10-07: moved off accounts.preferences.ai_memory to the ai_memories
+   table. The JSON store capped facts by read-modify-write, so two saves
+   landing together could lose one; the table's UPSERT is atomic and the cap
+   is one statement (ai_memories_cap). The preferences key is no longer read
+   here — the migration carried its facts over.
    --------------------------------------------------------------------------- */
 
-import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
 import { readPersonalization } from "@/lib/server/ai/personalization-prompt";
+import {
+  MEMORY_MAX_KEY,
+  MEMORY_MAX_VALUE,
+  readMemories,
+  rememberFact,
+  forgetFact,
+} from "@/lib/server/ai/user-memory-store";
 import type { ToolDef, ToolResult } from "../types";
 import { supabaseServer } from "../../supabase-server";
-
-const MAX_FACTS = 25;
-const MAX_KEY = 40;
-const MAX_VALUE = 200;
 
 const rememberAboutUser: ToolDef<
   { key: string; value: string },
@@ -39,9 +44,9 @@ const rememberAboutUser: ToolDef<
     },
     required: ["key", "value"],
   },
-  /* No module gate: this writes to the caller's OWN account preferences.
-     Every signed-in user may record their own facts, and the handler can
-     only ever touch ctx.auth.account_id. */
+  /* No module gate: this writes to the caller's OWN account. Every signed-in
+     user may record their own facts, and the handler can only ever touch
+     ctx.auth.account_id. */
   requiredModule: undefined,
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<{ remembered: Record<string, string> }>> => {
@@ -52,55 +57,32 @@ const rememberAboutUser: ToolDef<
         message: "Not while viewing as another user." };
     }
 
-    const key = String(args.key ?? "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").slice(0, MAX_KEY);
-    const value = String(args.value ?? "").trim().slice(0, MAX_VALUE);
+    const key = String(args.key ?? "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").slice(0, MEMORY_MAX_KEY);
+    const value = String(args.value ?? "").trim().slice(0, MEMORY_MAX_VALUE);
     if (!key || !value) {
       return { ok: false, permissionStatus: "allowed", data: null,
         message: "Both a key and a value are required." };
     }
 
-    /* PHASE 7 / finding N12. This still READS the current facts, because the
-       25-cap needs to know what is already there — but it no longer writes the
-       whole preferences document back. The write is one atomic merge of the
-       `ai_memory` key alone, so a concurrent setReplyLanguage can no longer be
-       erased by it (or erase it).
-
-       A narrower race remains and is worth naming rather than implying it is
-       gone: two remember_about_user calls landing together can still lose one
-       fact, because the cap is computed from a read. That needs one row per
-       fact — the `ai_memories` table in plan §S — and it is far less reachable
-       than the one this fixes, which a single message could trigger. */
-    const { data, error } = await supabaseServer
-      .from("accounts").select("preferences").eq("id", ctx.auth.account_id).maybeSingle();
-    if (error) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't read your profile." };
-    }
-
-    const prefs = ((data?.preferences ?? {}) as Record<string, unknown>);
     /* Memory switched off in Settings → Koleex AI: nothing is stored, and
        the user is told where the switch is rather than left believing the
        fact was kept. Existing facts are untouched — off means "do not
-       read or write", not "erase"; erasing is its own button. */
-    if (!readPersonalization(prefs).memory) {
+       read or write", not "erase"; erasing is its own button.
+       One small read of the account row for the switch; the facts themselves
+       live in ai_memories now. */
+    const { data } = await supabaseServer
+      .from("accounts").select("preferences").eq("id", ctx.auth.account_id).maybeSingle();
+    if (!readPersonalization((data?.preferences ?? {}) as Record<string, unknown>).memory) {
       return { ok: false, permissionStatus: "allowed", data: null,
         message: "Memory is turned off in Settings → Koleex AI, so this was not saved. Tell the user they can turn it on there." };
     }
-    const current = (prefs.ai_memory ?? {}) as Record<string, string>;
-    const next: Record<string, string> = { ...current, [key]: value };
 
-    /* Cap the store so a long-running chat can't grow it without bound;
-       drop the oldest keys first (insertion order is preserved by JSON). */
-    const keys = Object.keys(next);
-    if (keys.length > MAX_FACTS) {
-      for (const k of keys.slice(0, keys.length - MAX_FACTS)) delete next[k];
-    }
-
-    const merged = await mergeAccountPrefs(ctx.auth.account_id, { ai_memory: next });
-    if (!merged) {
+    const ok = await rememberFact(ctx.auth.account_id, key, value);
+    if (!ok) {
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't save that." };
     }
-
-    return { ok: true, permissionStatus: "allowed", data: { remembered: next } };
+    return { ok: true, permissionStatus: "allowed",
+      data: { remembered: await readMemories(ctx.auth.account_id) } };
   },
 };
 
@@ -121,16 +103,9 @@ const forgetAboutUser: ToolDef<{ key: string }, { remembered: Record<string, str
         message: "Not while viewing as another user." };
     }
     const key = String(args.key ?? "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_");
-    const { data } = await supabaseServer
-      .from("accounts").select("preferences").eq("id", ctx.auth.account_id).maybeSingle();
-    const prefs = ((data?.preferences ?? {}) as Record<string, unknown>);
-    const next = { ...((prefs.ai_memory ?? {}) as Record<string, string>) };
-    delete next[key];
-    /* The merge is SHALLOW at the top level, which is what makes removal work:
-       writing a smaller ai_memory object REPLACES the old one rather than
-       deep-merging the deleted key back in. Verified on staging. */
-    await mergeAccountPrefs(ctx.auth.account_id, { ai_memory: next });
-    return { ok: true, permissionStatus: "allowed", data: { remembered: next } };
+    await forgetFact(ctx.auth.account_id, key);
+    return { ok: true, permissionStatus: "allowed",
+      data: { remembered: await readMemories(ctx.auth.account_id) } };
   },
 };
 
