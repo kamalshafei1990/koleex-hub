@@ -187,7 +187,8 @@
     "validate:finance-i18n": "tsx scripts/validate-finance-i18n.ts",
     "validate:contacts-i18n": "tsx scripts/validate-contacts-i18n.ts",
     "validate:home-layout": "tsx scripts/validate-home-layout.ts",
-    "validate:notes-collab": "tsx scripts/validate-notes-collab.ts"
+    "validate:notes-collab": "tsx scripts/validate-notes-collab.ts",
+    "validate:ratings": "tsx scripts/validate-ratings.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
