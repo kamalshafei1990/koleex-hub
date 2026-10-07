@@ -413,6 +413,35 @@ libraries and digital clock/date UI components.
 
 ---
 
+# KOLEEX Brand Guidelines — the official document (source of truth)
+
+URL: https://koleex-gl.netlify.app (owner-supplied 2026-10-07: "check this
+carefully and remember this, you also can put as a source we will use it
+later"). Treat it as the authoritative brand reference for ANY design,
+marketing, packaging, print, social, website or character work — check the
+relevant section there BEFORE producing brand-facing output.
+
+Structure: 36 sections in 4 categories — Foundation (01-09), Visual Identity
+(10-19), Digital & Media (20-27), Management (28-36, some marked Soon).
+200+ design rules, trilingual (English/中文/العربية).
+
+Core facts learned (verify against the site when details matter):
+- KOLEEX = Knowledge, Operations, Logic, Evolution, Excellence, Execution —
+  a working cycle, not just a name.
+- Design philosophy: minimal, grid-based, black & white first, limited
+  accent color (max 2, functional only), large negative space,
+  typography-driven, functional, industrial-technology style.
+- Brand personality: quiet, confident, intelligent, structured, engineered
+  — never playful, cheap, loud, trendy, cartoon, gaming or fashion style.
+- Governance: logo never modified; no design outside the system without
+  approval; consistency over creativity; structure over decoration.
+- The repo's own Brand Book (src/lib/brand-book, 140 chapters) and the
+  colors in src/lib/brand-book/tokens.ts follow the same identity; when the
+  two disagree, this official site wins and the difference is worth
+  flagging to Kamal.
+
+---
+
 # KOLEEX Hub — Performance & Mainland China
 
 A significant portion of users operate from Mainland China. The system should
@@ -519,6 +548,16 @@ kx-ground-host` scope, the app's WavyBackground ground, the CARD recipe
 (kx-glass + border-subtle + bg-surface) and design tokens. Do NOT set
 data-kx-skin/data-theme per element — the bootstrap script already pins them
 on <html>; per-element values caused a hydration mismatch.
+
+## App-creation discipline (owner decision 2026-10-07)
+
+NO new "Reminders" app. A reminder IS a task with a time; a separate app
+duplicates the To-do data model and splits one question across two screens.
+Reminder capabilities belong to: To-do (remind_at + push notification),
+Calendar (reminder_minutes + cron), Events (event reminders + RSVP nudges),
+and the AI agent (natural-language "remind me…" creates a To-do or Calendar
+entry). Rule of thumb: a new app must answer a QUESTION the existing apps
+cannot — when in doubt, extend the existing app, don't spawn a sibling.
 
 ## Colored answer buttons — the owner's approved recipe (owner-picked)
 

@@ -649,6 +649,16 @@ kx-ground-host` scope, the app's WavyBackground ground, the CARD recipe
 data-kx-skin/data-theme per element — the bootstrap script already pins them
 on <html>; per-element values caused a hydration mismatch.
 
+## App-creation discipline (owner decision 2026-10-07)
+
+NO new "Reminders" app. A reminder IS a task with a time; a separate app
+duplicates the To-do data model and splits one question across two screens.
+Reminder capabilities belong to: To-do (remind_at + push notification),
+Calendar (reminder_minutes + cron), Events (event reminders + RSVP nudges),
+and the AI agent (natural-language "remind me…" creates a To-do or Calendar
+entry). Rule of thumb: a new app must answer a QUESTION the existing apps
+cannot — when in doubt, extend the existing app, don't spawn a sibling.
+
 ## Colored answer buttons — the owner's approved recipe (owner-picked)
 
 For action buttons whose color MEANS something (RSVP answers, destructive,
