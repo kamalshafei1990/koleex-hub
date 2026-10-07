@@ -169,6 +169,9 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   /* Self-scoped and reversible — §L's own examples for this class. */
   remember_about_user: { domain: "knowledge", risk: "low_risk_write" },
   forget_about_user: { domain: "knowledge", risk: "low_risk_write" },
+  /* Reads only the caller's own history (account + tenant inside the one
+     query), gated by the same memory switch. §L's read class. */
+  search_past_conversations: { domain: "knowledge", risk: "read_only" },
 
   /* ── the public internet ───────────────────────────────────────────── */
   /* The only tool that leaves our network. The inference this file replaces

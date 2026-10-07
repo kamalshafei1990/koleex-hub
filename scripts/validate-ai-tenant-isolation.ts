@@ -63,6 +63,10 @@ const TENANT_SCOPED = new Set([
   "note_shares",
   /* Reports 6B: searchReports filters every read by the caller's tenant. */
   "work_reports",
+  /* Phase 3 memory recall (2026-10-07): search_past_conversations filters
+     every read by the caller's tenant — directly for the recent list, and
+     through the ai_conversations!inner join for message search. */
+  "ai_conversations",
 ]);
 
 /* Tables that are SHARED by design (no tenant_id column), or are keyed by a
@@ -87,6 +91,8 @@ const SHARED_BY_DESIGN: Record<string, string> = {
   accounts: "keyed by ctx.auth.account_id — the caller's own row; or the tenant's INTERNAL accounts, filtered by tenant_id, for createTodo's assignee expansion (as /api/todos POST)",
   koleex_permissions: "keyed by ctx.auth.role_id",
   account_permission_overrides: "keyed by ctx.auth.account_id",
+  ai_memories: "keyed by ctx.auth.account_id — the caller's own rows; an account belongs to exactly one tenant (same rule as account_permission_overrides)",
+  ai_messages: "child of ai_conversations; the !inner join tenant-verifies the parent in the SAME query (past-conversations.ts)",
   quotation_items: "child of quotations; parent tenant-verified before insert",
   koleex_todo_assignees: "child of koleex_todos; parent tenant-verified",
   pricing_markets: "shared pricing reference data",

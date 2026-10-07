@@ -62,6 +62,7 @@ import { calendarTools } from "./tools/calendar";
 import { notesTools } from "./tools/notes";
 import { reportTools } from "./tools/reports";
 import { userMemoryTools } from "./tools/user-memory";
+import { pastConversationTools } from "./tools/past-conversations";
 import { teamKnowledgeTools } from "./tools/team-knowledge";
 import { knowledgeSearchTools } from "./tools/knowledge-search";
 /* The agent's only route to the public internet — see tools/web-search.ts
@@ -92,6 +93,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...notesTools,
       ...reportTools,
   ...userMemoryTools,
+  ...pastConversationTools,
   ...teamKnowledgeTools,
   ...knowledgeSearchTools,
       ...webSearchTools,

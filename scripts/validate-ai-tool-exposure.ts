@@ -108,8 +108,8 @@ const PROFILES: Array<[string, UserContext]> = [
 const ALL = listTools();
 
 console.log("\n── 1. The registry is intact ──");
-/* 57 since Reports 6B added searchReports, readReport, whoOwesReports and startReportDraft. */
-check("all 57 tools are still registered", ALL.length === 57);
+/* 58 since Phase 3 cross-conversation memory added search_past_conversations. */
+check("all 58 tools are still registered", ALL.length === 58);
 check("every tool has a name and a description", ALL.every((t) => !!t.name && !!t.description));
 
 console.log("\n── 2. Exposure and dispatch agree, for every tool × every profile ──");

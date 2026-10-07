@@ -76,9 +76,10 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   suggest_team_knowledge: "creating-record",
   /* people */
   findTeamMember: "searching",
-  /* the user's own memory */
+  /* the user's own memory and past conversations */
   remember_about_user: "creating-record",
   forget_about_user: "executing-action",
+  search_past_conversations: "searching",
   /* pictures */
   generate_image: "generating",
   /* a question back to the user is thinking, not doing */
