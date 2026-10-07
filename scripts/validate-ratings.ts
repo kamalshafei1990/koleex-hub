@@ -128,5 +128,24 @@ console.log("\n── 7. Phase 4 — the calibration overview ──");
     /cycle\.status === "scoring" \|\| cycle\.status === "draft"\) \{ setOverview\(null\)/.test(mod));
 }
 
+console.log("\n── 8. Phase 5 — AI coaching, guarded ──");
+{
+  const coaching = readFileSync("src/lib/server/ratings/coaching.ts", "utf8");
+  const tool = readFileSync("src/lib/server/ai-agent/tools/employee-rating.ts", "utf8");
+  check("coaching runs after reports and can never block a finalize",
+    /generateCoaching\(cycle\)/.test(cycleRoute) && /best-effort/.test(coaching) && /continue; \/\/ a clean month/.test(coaching.replace(/\s+/g, " ")) || /if \(gaps\.length === 0\) continue/.test(coaching));
+  check("the coach prompt carries the guardrails: skill not person, one action, no comparison, no promises, no inventions",
+    /never the person's character or worth/.test(coaching) && /One concrete action per suggestion/.test(coaching) &&
+    /Never compare them to colleagues/.test(coaching) && /Never promise numbers/.test(coaching) && /Never invent courses/.test(coaching));
+  check("suggestions are capped and sanitized before they reach a report",
+    /MAX_SUGGESTIONS = 3/.test(coaching) && /slice\(0, MAX_SUGGESTIONS\)/.test(coaching) && /l\.length > 12/.test(coaching));
+  check("a provider failure leaves the deterministic list — try/catch, continue",
+    /} catch {/.test(coaching) && /the deterministic list stays/.test(coaching));
+  check("the tool answers own-rating without a module gate and others' behind HR view",
+    /requiredModule: undefined/.test(tool) && /requireModuleAction\(ctx\.auth, "HR", "view"\)/.test(tool));
+  check("only finalized/published cycles answer — a draft never leaks through the AI",
+    /in\("rating_cycles.status", \["finalized", "published"\]\)/.test(tool));
+}
+
 console.log(failures === 0 ? "\nvalidate:ratings — all checks passed" : `\nvalidate:ratings FAILED — ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

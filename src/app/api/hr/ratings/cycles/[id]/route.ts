@@ -17,6 +17,7 @@ import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/ser
 import { logAudit } from "@/lib/server/audit";
 import { weightedScore } from "@/lib/skills/scoring";
 import { generateRatingReports, notifyRatingPublished } from "@/lib/server/ratings/publish";
+import { generateCoaching } from "@/lib/server/ratings/coaching";
 
 const MODULE = "HR";
 
@@ -201,7 +202,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     /* the documents are born with the finalize — one report per employee,
        submitted and confidential from the first second (ratings/publish.ts) */
     const { created } = await generateRatingReports(cycle, auth);
-    detail = { summaries: result.summaries, reports: created };
+    /* coaching rides AFTER the reports exist and never blocks them: a
+       provider hiccup leaves the deterministic gap list in place */
+    const { coached } = await generateCoaching(cycle);
+    detail = { summaries: result.summaries, reports: created, coached };
   }
 
   const stamp = action === "finalize" ? { finalized_at: new Date().toISOString() }

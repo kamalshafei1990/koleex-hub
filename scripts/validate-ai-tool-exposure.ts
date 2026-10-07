@@ -108,8 +108,8 @@ const PROFILES: Array<[string, UserContext]> = [
 const ALL = listTools();
 
 console.log("\n── 1. The registry is intact ──");
-/* 58 since Phase 3 cross-conversation memory added search_past_conversations. */
-check("all 58 tools are still registered", ALL.length === 58);
+/* 59 since Phase 5 monthly ratings added get_employee_rating. */
+check("all 59 tools are still registered", ALL.length === 59);
 check("every tool has a name and a description", ALL.every((t) => !!t.name && !!t.description));
 
 console.log("\n── 2. Exposure and dispatch agree, for every tool × every profile ──");
@@ -242,8 +242,10 @@ console.log("\n── 9. \"denied\" is a permission, never a failure ──");
   }
   check(`every "denied" a tool writes reads as a permission${mislabelled.length ? ` — not these: ${mislabelled.join(" | ")}` : ""}`,
     mislabelled.length === 0);
+  /* 2026-10-07: get_employee_rating adds one genuine denial (others' ratings
+     need HR view), so the band's ceiling moved with it. */
   check("the genuine ones survive — ownership and view-as, in the files that have them",
-    denied >= 8 && denied <= 12);
+    denied >= 8 && denied <= 13);
   check("and the failures now answer allowed + ok:false, in numbers, not by accident",
     failuresAllowed >= 60);
   /* The sites that actually bit the owner, by name. */

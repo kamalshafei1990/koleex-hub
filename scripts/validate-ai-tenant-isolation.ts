@@ -67,6 +67,9 @@ const TENANT_SCOPED = new Set([
      every read by the caller's tenant — directly for the recent list, and
      through the ai_conversations!inner join for message search. */
   "ai_conversations",
+  /* Phase 5: get_employee_rating filters rating_summaries by the caller's
+     tenant on every read. */
+  "rating_summaries",
 ]);
 
 /* Tables that are SHARED by design (no tenant_id column), or are keyed by a

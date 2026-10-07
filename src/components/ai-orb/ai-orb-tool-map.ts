@@ -80,6 +80,7 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   remember_about_user: "creating-record",
   forget_about_user: "executing-action",
   search_past_conversations: "searching",
+  get_employee_rating: "reading",
   /* pictures */
   generate_image: "generating",
   /* a question back to the user is thinking, not doing */

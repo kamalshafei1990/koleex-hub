@@ -277,7 +277,9 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   const chosen = readFileSync(join(srcRoot, "components/ai-orb/ChosenOrb.tsx"), "utf8");
   check("wiring: ChosenOrb reads the store, and a preview can pin its own style",
     /const chosen = useOrbStyle\(\);/.test(chosen) && /const draw = style \?\? chosen;/.test(chosen) &&
-    /if \(draw === "dots" \|\| draw === "mochi"\) \{[\s\S]{0,500}?<DottedOrb \{\.\.\.props\}/.test(chosen) &&
+    /* the branch grew a counter-scale span for Mochi's icon tuck (cad5c6c07
+       + 2396a830f) — the window covers it */
+    /if \(draw === "dots" \|\| draw === "mochi"\) \{[\s\S]{0,1200}?<DottedOrb \{\.\.\.props\}/.test(chosen) &&
     /<MochiOrb \{\.\.\.props\}/.test(chosen));
   /* The dots load only for whoever chose them: a static import put DottedOrb
      and its engine in the chunk every orb route shares, and validate:budgets
@@ -433,8 +435,10 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /w-\[72px\] h-\[72px\] md:w-\[112px\] md:h-\[112px\]/.test(home) &&
     /max-md:scale-\[0\.6429\]/.test(home) && Math.abs(0.6429 * 112 - 72) < 0.01 &&
     /wander=\{wander\}/.test(glow));
-  check("home: the Koleex AI tile draws its orb at 1.8× the icon slot, centred on the slot, so the tile and its label do not move",
-    /const AI_TILE_ORB = 1\.8;/.test(home) &&
+  /* 2026-10-07 (cad5c6c07): the tile factor is 1.15× now — 1.8× made the AI
+     app shout over its neighbours. The pin follows the owner's new pick. */
+  check("home: the Koleex AI tile draws its orb at 1.15× the icon slot, centred on the slot, so the tile and its label do not move",
+    /const AI_TILE_ORB = 1\.15;/.test(home) &&
     /const orbPx = Math\.round\(iconPx \* AI_TILE_ORB\);/.test(home) &&
     /<span className="relative block" style=\{\{ width: iconPx, height: iconPx \}\}>\s*<span className="absolute left-1\/2 top-1\/2 -translate-x-1\/2 -translate-y-1\/2">\s*<AnimatedIcon size=\{orbPx\} animated scaleClass="scale-100" \/>/.test(home));
   const welcome = readFileSync(join(srcRoot, "components/ai/WelcomeCard.tsx"), "utf8");

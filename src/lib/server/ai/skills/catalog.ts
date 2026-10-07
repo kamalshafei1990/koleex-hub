@@ -172,6 +172,8 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   /* Reads only the caller's own history (account + tenant inside the one
      query), gated by the same memory switch. §L's read class. */
   search_past_conversations: { domain: "knowledge", risk: "read_only" },
+  /* Phase 5: own rating for everyone, others' behind HR view — handler-gated. */
+  get_employee_rating: { domain: "work", risk: "read_only" },
 
   /* ── the public internet ───────────────────────────────────────────── */
   /* The only tool that leaves our network. The inference this file replaces
