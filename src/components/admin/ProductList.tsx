@@ -2450,7 +2450,8 @@ export default function ProductList() {
       .filter(x => x.score >= 0)
       .sort((a, b) => a.score - b.score)
       .slice(0, 4)
-      .map(({ c }): Suggestion => ({ kind: "category", slug: c.slug, label: c.name, count: categoryProductCounts[c.slug] || 0 }));
+      .map(({ c }): Suggestion => ({ kind: "category", slug: c.slug, label: c.name, count: categoryProductCounts[c.slug] || 0 }))
+      .filter((s) => "count" in s && s.count > 0);
 
     const subs = subcategories
       .map(s => ({ s, score: prefixThenContains(s.name, q) }))
@@ -2470,7 +2471,8 @@ export default function ProductList() {
       .filter(x => x.score >= 0)
       .sort((a, b) => a.score - b.score)
       .slice(0, 3)
-      .map(({ b }): Suggestion => ({ kind: "brand", label: b, count: brandProductCounts[b] || 0 }));
+      .map(({ b }): Suggestion => ({ kind: "brand", label: b, count: brandProductCounts[b] || 0 }))
+      .filter((s) => "count" in s && s.count > 0);
 
     /* Suppliers ride the same dropdown — clicking one filters the grid to
        that supplier's products, the same gesture brands already have.
@@ -2481,7 +2483,8 @@ export default function ProductList() {
       .filter(x => x.score >= 0)
       .sort((a, b) => a.score - b.score)
       .slice(0, 3)
-      .map(({ name }): Suggestion => ({ kind: "supplier", label: name, count: supplierProductCounts[name] || 0 }));
+      .map(({ name }): Suggestion => ({ kind: "supplier", label: name, count: supplierProductCounts[name] || 0 }))
+      .filter((s) => "count" in s && s.count > 0);
 
     const qSquashed = squash(q);
     const prods: Suggestion[] = [];
@@ -3488,7 +3491,7 @@ export default function ProductList() {
             <div
               ref={railRef}
               role="group"
-              className="relative flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fit,minmax(86px,1fr))] sm:gap-1.5"
+              className="relative flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fill,minmax(86px,120px))] sm:justify-start sm:gap-1.5"
             >
               {/* The one sliding selection — position and size are data
                   (inline), the paint and the motion live on the class. */}
