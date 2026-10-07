@@ -215,6 +215,7 @@ export const docsT: Translations = {
   "picker.noCustomers":  { en: "No customers match \"{q}\".", zh: "没有与“{q}”匹配的客户。", ar: "لا يوجد عملاء يطابقون «{q}»." },
   "picker.noCustomersYet": { en: "No customers in your CRM yet.", zh: "您的 CRM 中还没有客户。", ar: "لا يوجد عملاء في إدارة العملاء بعد." },
   "picker.productTitle": { en: "Pick a product",   zh: "选择产品",          ar: "اختر منتجًا" },
+  "picker.noDivision": { en: "Other products", zh: "其他产品", ar: "منتجات أخرى" },
   "picker.productPh":    { en: "Search model code, SKU or product name…", zh: "搜索型号、SKU 或产品名称…", ar: "ابحث برمز الموديل أو SKU أو اسم المنتج…" },
   "picker.loadingCatalog": { en: "Loading catalog…", zh: "正在加载目录…",   ar: "جارٍ تحميل الكتالوج…" },
   "picker.noProducts":   { en: "No products match \"{q}\".", zh: "没有与“{q}”匹配的产品。", ar: "لا توجد منتجات تطابق «{q}»." },

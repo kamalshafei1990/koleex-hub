@@ -23,6 +23,7 @@ import { docsT } from "@/lib/translations/docs";
 import { record } from "@/lib/perf/client";
 import { cdnImage } from "@/lib/cdn";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 
 export interface PickerRow {
   product_id: string;
@@ -32,6 +33,8 @@ export interface PickerRow {
   product_name: string;
   price: number;
   image_url: string | null;
+  /** Catalog division (taxonomy level 1) — powers the grouped browse. */
+  division_slug: string;
 }
 
 export interface PickResult {
@@ -98,6 +101,7 @@ export default function ProductPickerModal({
   const { t } = useTranslation(docsT);
   const [query, setQuery] = useState("");
   const [allRows, setAllRows] = useState<PickerRow[]>([]);
+  const [divisions, setDivisions] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -143,9 +147,10 @@ export default function ProductPickerModal({
             setAllRows([]);
             return;
           }
-          const json = (await res.json()) as { rows: PickerRow[] };
+          const json = (await res.json()) as { rows: PickerRow[]; divisions?: Record<string, string> };
           if (seq !== seqRef.current) return;
           setAllRows(json.rows ?? []);
+          setDivisions(json.divisions ?? {});
           setError(null);
           if (typeof performance !== "undefined") {
             record("quotations.picker.product_ms", performance.now() - t0);
@@ -166,17 +171,23 @@ export default function ProductPickerModal({
     };
   }, [open, query]);
 
-  /* Instant client-side ranked filter. Empty query → the whole catalog,
-     sorted A→Z, so the modal doubles as a browseable list. */
+  /* Instant client-side ranked filter. Empty query → browse: grouped by
+     division (taxonomy order), A→Z inside each group, so the modal reads as
+     an organized catalogue rather than a flat dump. Typed query → the whole
+     ranked flat list (grouping would fight the ranking). */
   const results = useMemo(() => {
     const terms = norm(query).split(" ").filter(Boolean);
     if (terms.length === 0) {
-      return allRows
-        .slice()
-        .sort((a, b) =>
-          (a.product_name || "").localeCompare(b.product_name || "") ||
-          (a.model_name || "").localeCompare(b.model_name || ""),
-        );
+      const order = Object.keys(divisions);
+      const rankOf = (slug: string) => {
+        const i = order.indexOf(slug);
+        return i === -1 ? 999 : i;
+      };
+      return allRows.slice().sort((a, b) =>
+        rankOf(a.division_slug) - rankOf(b.division_slug) ||
+        (a.product_name || "").localeCompare(b.product_name || "") ||
+        (a.model_name || "").localeCompare(b.model_name || ""),
+      );
     }
     return allRows
       .map((row) => ({ row, score: scoreRow(row, terms) }))
@@ -187,9 +198,10 @@ export default function ProductPickerModal({
           (a.row.product_name || "").localeCompare(b.row.product_name || ""),
       )
       .map((x) => x.row);
-  }, [allRows, query]);
+  }, [allRows, query, divisions]);
 
   const shown = results.slice(0, MAX_RENDER);
+  const browsing = norm(query).trim() === "";
 
   /* Keep the active row in range whenever the result set changes. */
   useEffect(() => { setActiveIdx(0); }, [query]);
@@ -272,7 +284,7 @@ export default function ProductPickerModal({
         )}
       </div>
 
-      <div ref={listRef} className="min-h-[200px]" role="listbox" aria-label={t("picker.productTitle")}>
+      <div ref={listRef} className="min-h-[200px] pt-1.5" role="listbox" aria-label={t("picker.productTitle")}>
         {loading && (
           <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-[var(--text-dim)]" role="status" aria-live="polite">
             <SpinnerIcon className="h-4 w-4" />
@@ -289,16 +301,27 @@ export default function ProductPickerModal({
         )}
         {!loading && shown.map((row, i) => {
           const active = i === activeIdx;
+          const header = browsing && (i === 0 || shown[i - 1].division_slug !== row.division_slug);
           return (
-            <button
-              key={row.model_id}
-              type="button"
-              role="option"
-              aria-selected={active}
-              data-active={active ? "1" : "0"}
-              onClick={() => pick(row)}
-              onMouseMove={() => { if (!active) setActiveIdx(i); }}
-              className={`mb-0.5 flex w-full items-center gap-3 rounded-lg border px-2.5 py-2 text-start transition-colors focus-visible:outline-none ${
+            <div key={row.model_id}>
+              {header && (
+                <div className="flex items-center gap-2 px-2.5 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] first:pt-1">
+                  <BoxesIcon size={12} className="shrink-0" />
+                  <span>{divisions[row.division_slug] || row.division_slug || t("picker.noDivision")}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                role="option"
+                aria-selected={active}
+                data-active={active ? "1" : "0"}
+                onClick={() => pick(row)}
+                onMouseMove={() => { if (!active) setActiveIdx(i); }}
+                /* The row hover/active is this picker's own language — Aurora's
+                   global button-hover override (Hub-blue border + fill,
+                   !important) was painting a foreign box over it. */
+                data-kx-keep-hover
+                className={`mb-0.5 flex w-full items-center gap-3 rounded-lg border px-2.5 py-2 text-start transition-colors focus-visible:outline-none ${
                 active
                   ? "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
                   : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]"
@@ -326,6 +349,7 @@ export default function ProductPickerModal({
                 {row.price > 0 ? `US$ ${row.price.toLocaleString("en-US")}` : "—"}
               </div>
             </button>
+            </div>
           );
         })}
       </div>
