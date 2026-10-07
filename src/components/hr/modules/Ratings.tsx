@@ -52,6 +52,13 @@ export default function RatingsModule({ employees, t, lang }: HRModuleProps) {
   const [dirty, setDirty] = useState<Map<string, { score: number | null; comment?: string; evidence?: string }>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [noteFor, setNoteFor] = useState<string | null>(null);
+  /* Phase 4: the calibration overview, loaded once the cycle leaves scoring. */
+  const [overview, setOverview] = useState<{
+    bands: Array<{ band: string; min_score: number; label: { en?: string; ar?: string; zh?: string }; color: string }>;
+    summaries: Array<{ employee_id: string; employee: string; overall: number | null; band: string | null; delta_overall: number | null; skills_avg: number | null; behavior_avg: number | null }>;
+    extremesNoEvidence: Array<{ employee: string; score: number; kind: string }>;
+    mandatoryGaps: Record<string, number>;
+  } | null>(null);
 
   const loadCycles = useCallback(async () => {
     const res = await fetch("/api/hr/ratings/cycles");
@@ -74,6 +81,14 @@ export default function RatingsModule({ employees, t, lang }: HRModuleProps) {
 
   useEffect(() => { void loadCycles(); }, [loadCycles]);
   useEffect(() => { if (activeId) void loadCycle(activeId); }, [activeId, loadCycle]);
+  useEffect(() => {
+    if (!cycle || cycle.status === "scoring" || cycle.status === "draft") { setOverview(null); return; }
+    let alive = true;
+    void fetch(`/api/hr/ratings/cycles/${cycle.id}/overview`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j) setOverview(j); });
+    return () => { alive = false; };
+  }, [cycle]);
 
   const empName = useMemo(() => {
     const m = new Map<string, string>();
@@ -235,6 +250,81 @@ export default function RatingsModule({ employees, t, lang }: HRModuleProps) {
             </div>
           </div>
           {error && <p className="px-5 py-2 text-[12px] text-red-400 border-b border-[var(--border-faint)]">{error}</p>}
+
+          {/* Phase 4: the calibration overview — only once the cycle leaves
+              scoring (the sheet itself answers everything before that). */}
+          {overview && (
+            <div className="px-5 py-4 border-b border-[var(--border-faint)] space-y-4">
+              {/* band distribution */}
+              <div>
+                <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
+                  {t("hr.ratings.distribution")}
+                </p>
+                <div className="flex items-end gap-2 flex-wrap">
+                  {[...overview.bands].sort((a, b) => a.min_score - b.min_score).map((b) => {
+                    const count = overview.summaries.filter((s) => s.band === b.band).length;
+                    const label = lang === "zh" ? (b.label.zh ?? b.band) : lang === "ar" ? (b.label.ar ?? b.band) : (b.label.en ?? b.band);
+                    return (
+                      <div key={b.band} className="flex flex-col items-center gap-1 min-w-[72px]">
+                        <span className="text-[18px] font-semibold tabular-nums text-[var(--text-primary)]">{count}</span>
+                        <div className="h-1 w-full rounded-full bg-[var(--border-subtle)]">
+                          <div className="h-1 rounded-full bg-[var(--border-focus)] transition-all"
+                            style={{ width: `${overview.summaries.length ? (count / overview.summaries.length) * 100 : 0}%` }} />
+                        </div>
+                        <span className="text-[10px] text-[var(--text-dim)] text-center">{label} · {b.min_score}+</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* movers — who moved most, both directions */}
+              {overview.summaries.some((s) => s.delta_overall !== null) && (
+                <div>
+                  <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
+                    {t("hr.ratings.movers")}
+                  </p>
+                  <div className="flex gap-6 flex-wrap">
+                    {(["up", "down"] as const).map((dir) => {
+                      const list = overview.summaries
+                        .filter((s) => s.delta_overall !== null && (dir === "up" ? s.delta_overall > 0 : s.delta_overall < 0))
+                        .sort((a, b) => dir === "up" ? b.delta_overall! - a.delta_overall! : a.delta_overall! - b.delta_overall!)
+                        .slice(0, 3);
+                      if (list.length === 0) return null;
+                      return (
+                        <div key={dir} className="min-w-[180px]">
+                          <p className={`text-[11px] font-medium mb-1 ${dir === "up" ? "text-emerald-400" : "text-red-400"}`}>
+                            {dir === "up" ? `↑ ${t("hr.ratings.movers.up")}` : `↓ ${t("hr.ratings.movers.down")}`}
+                          </p>
+                          {list.map((s) => (
+                            <p key={s.employee_id} className="text-[12px] text-[var(--text-primary)]">
+                              {s.employee} <span className="text-[var(--text-dim)] tabular-nums">{s.delta_overall! > 0 ? "+" : ""}{s.delta_overall}</span>
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* review red flags */}
+              {(overview.extremesNoEvidence.length > 0 || Object.keys(overview.mandatoryGaps).length > 0) && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 space-y-1">
+                  {overview.extremesNoEvidence.length > 0 && (
+                    <p className="text-[12px] text-amber-400">
+                      ⚠ {overview.extremesNoEvidence.length} {t("hr.ratings.extremesNoEvidence")}
+                    </p>
+                  )}
+                  {Object.keys(overview.mandatoryGaps).length > 0 && (
+                    <p className="text-[12px] text-amber-400">
+                      ⚠ {Object.keys(overview.mandatoryGaps).length} {t("hr.ratings.gapsLeft")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* employee chips */}
           <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border-faint)] overflow-x-auto">

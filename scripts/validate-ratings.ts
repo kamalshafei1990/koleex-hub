@@ -91,5 +91,42 @@ for (const [name, src] of [["cycles list/open", cyclesRoute], ["cycle detail/tra
 check("opening the same month twice is a clean 409",
   /error\.code === "23505"/.test(cyclesRoute));
 
+console.log("\n── 6. Phase 3 — the report is born at finalize, delivered at publish ──");
+{
+  const publish = readFileSync("src/lib/server/ratings/publish.ts", "utf8");
+  const catalog = readFileSync("src/lib/reports/catalog.ts", "utf8");
+  check("the hr_monthly_rating template exists, confidential, with the four sections",
+    /hr\("hr_monthly_rating", "performance", "award"/.test(catalog) && /confidential: true/.test(catalog) &&
+    /t\("summary", "text", true\), t\("skills", "list"\), t\("behavior", "list"\), t\("actions", "list"\)/.test(catalog));
+  check("finalize generates one submitted+confidential report per employee",
+    /generateRatingReports/.test(cycleRoute) && /status: "submitted"/.test(publish) && /confidential: true/.test(publish));
+  check("generation is keyed by the cycle — a re-finalize never duplicates reports",
+    /eq\("period_key", cycle\.month\.slice\(0, 7\)\)/.test(publish) && /if \(existing && existing\.length > 0\) return \{ created: 0 \}/.test(publish));
+  check("the employee is the 'to' reader of their own report; the actor is cc",
+    /role: "to" as const/.test(publish) && /role: "cc" as const/.test(publish));
+  check("publish notifies recipients once (supersede keyed by report)",
+    /notifyRatingPublished\(cycle\)/.test(cycleRoute) && /supersede: \{ report_id/.test(publish));
+  check("the improvement list is deterministic until Phase 5 — items below required, weakest first",
+    /i\.score < i\.required_score/.test(publish) && /weakest first/.test(publish));
+}
+
+console.log("\n── 7. Phase 4 — the calibration overview ──");
+{
+  const overview = readFileSync("src/app/api/hr/ratings/cycles/[id]/overview/route.ts", "utf8");
+  const mod = readFileSync("src/components/hr/modules/Ratings.tsx", "utf8");
+  check("the overview is HR-gated and tenant-scoped",
+    /requireModuleAccess\(auth, MODULE\)/.test(overview) && /cycle\.tenant_id !== auth\.tenant_id/.test(overview));
+  check("it refuses while the cycle is still scoring — the sheet answers there",
+    /status === "scoring" \|\| cycle\.status === "draft"/.test(overview) && /409/.test(overview));
+  check("extremes without evidence are the review's red flags",
+    /i\.score < 30 \|\| i\.score > 90/.test(overview) && /!i\.evidence\?\.trim\(\)/.test(overview));
+  check("employee names come from ONE joined read, never per row",
+    /from\("koleex_employees"\)\.select\("id, person:person_id\(full_name\)"\)/.test(overview));
+  check("the module renders distribution, movers and red flags from the overview",
+    /hr\.ratings\.distribution/.test(mod) && /hr\.ratings\.movers/.test(mod) && /extremesNoEvidence/.test(mod));
+  check("the overview loads only once the cycle leaves scoring",
+    /cycle\.status === "scoring" \|\| cycle\.status === "draft"\) \{ setOverview\(null\)/.test(mod));
+}
+
 console.log(failures === 0 ? "\nvalidate:ratings — all checks passed" : `\nvalidate:ratings FAILED — ${failures}`);
 process.exit(failures === 0 ? 0 : 1);
