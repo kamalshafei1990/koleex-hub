@@ -3601,7 +3601,13 @@ export default function ProductList() {
                     style={railInd ? { ["--kx-notch-x" as string]: `${railInd.x + railInd.w / 2}px` } : undefined}
                   >
                     <span aria-hidden className="kx-sub-notch" />
-                    <div className="relative min-w-0 flex gap-1.5 overflow-x-auto -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:flex-wrap">
+                    {/* Owner, 2026-10-08: "organize this list more symmetric".
+                        A same-width grid — two columns on the phone, three
+                        then four as the screen widens — replaces the ragged
+                        flex-wrap of fit-content pills. The sliding indicator
+                        measures offsetLeft/Top, which grids answer the same
+                        way, so the selection motion is untouched. */}
+                    <div className="relative min-w-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pb-1">
                       <span
                         aria-hidden
                         className="kx-rail-ind kx-rail-ind--tile"
@@ -3621,13 +3627,13 @@ export default function ProductList() {
                             type="button"
                             aria-pressed={on}
                             onClick={() => { setFilterSub(x.slug); pressRail(); }}
-                            className={`relative inline-flex shrink-0 items-center gap-2 h-9 ps-3 pe-2 rounded-xl border whitespace-nowrap select-none text-[12.5px] font-medium transition-colors ${
+                            className={`relative inline-flex w-full items-center justify-between gap-2 h-9 ps-3 pe-2 rounded-xl border whitespace-nowrap select-none text-[12.5px] font-medium transition-colors ${
                               coreOn
                                 ? "bg-[var(--bg-inverted)] border-transparent text-[var(--text-inverted)]"
                                 : `kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in ${on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`
                             }`}
                           >
-                            <span className="max-w-[16rem] truncate">{x.name}</span>
+                            <span className="min-w-0 truncate text-start">{x.name}</span>
                             <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"}`}>{x.count}</span>
                           </button>
                         );

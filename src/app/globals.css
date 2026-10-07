@@ -4451,7 +4451,10 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   z-index: 1;
 }
 .kx-hover-card:hover {
-  transform: translateY(-2px);
+  /* NO LIFT (owner, 2026-10-08, on the product grid: "when I hover it, it
+     changes its position"). The ring (::after), the inner glow (::before)
+     and the shadow carry the hover now — the card itself never moves, so a
+     dense grid stays perfectly still under the cursor. */
   box-shadow: 0 0 16px rgba(86,127,178,.28), 0 10px 30px -12px rgba(0,0,0,.35);
 }
 .kx-hover-card:hover::after { opacity: 1; }
