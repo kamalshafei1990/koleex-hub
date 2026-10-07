@@ -265,6 +265,7 @@ const NO_TEMPLATE: Record<string, string> = {
   ai_brief: "written in the reader's own language already — briefText(counts, lang)",
   discuss_message: "push-only: never an inbox row",
   test: "push-only: the user's own test push",
+  report_rating_published: "system-written words (ratings/publish.ts) — the report is the content, the note just points at it",
 };
 const staleNoTpl = Object.keys(NO_TEMPLATE).filter((t) => !entries.has(t));
 check("every NO_TEMPLATE exception is a registered type", staleNoTpl.length === 0, staleNoTpl.join(", "));

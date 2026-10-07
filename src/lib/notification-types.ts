@@ -104,6 +104,8 @@ export const NOTIFICATION_TYPES = {
   /* ── Reports ───────────────────────────────────────────────────────── */
   report_approval_request:  { app: "reports", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "report_id", when: "the report is approved or returned" } },
   report_submitted:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
+  /* Monthly ratings: the employee's own report just published. */
+  report_rating_published:  { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_decided:           { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_comment:           { app: "reports", activity: "comments_activity", severity: "info", lifecycle: { kind: "supersede", key: "report_id" } },
   report_forwarded:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },

@@ -324,7 +324,7 @@ console.log("\n§3 templates and their words");
   /* 5C (owner's picks 26 Sep 2026): HR's 31, Projects' 20, Inventory's 4 and Finance's 6, after the Phase 1 HR types. */
   const hr5c = ["hr_hiring_plan", "hr_pipeline", "hr_interview", "hr_reference_check", "hr_offer", "hr_onboarding", "hr_new_hire", "hr_attendance", "hr_lateness", "hr_leave", "hr_overtime",
     "hr_payroll", "hr_staff_cost", "hr_insurance", "hr_salary_review", "hr_appraisal", "hr_appraisal_results", "hr_training", "hr_skills", "hr_behavior", "hr_investigation", "hr_grievance_summary",
-    "hr_movement", "hr_turnover", "hr_end_of_service", "hr_expiring", "hr_contracts", "hr_missing_files", "hr_safety_inspection", "hr_monthly", "hr_headcount"];
+    "hr_movement", "hr_turnover", "hr_end_of_service", "hr_expiring", "hr_contracts", "hr_missing_files", "hr_safety_inspection", "hr_monthly", "hr_headcount", "hr_monthly_rating"];
   const prj5c = ["prj_proposal", "prj_charter", "prj_plan", "prj_stakeholders", "prj_status", "prj_progress", "prj_budget", "prj_resources", "prj_overdue", "prj_dependencies", "prj_risks",
     "prj_change", "prj_milestone", "prj_acceptance", "prj_quality", "prj_portfolio", "prj_at_risk", "prj_closure", "prj_post_review", "prj_team_eval"];
   const invFin5c = ["inv_count", "inv_writeoff", "inv_movement", "inv_low_stock", "fin_expenses", "fin_petty_cash", "fin_budget", "fin_cash_flow", "fin_statements", "fin_month_close"];
@@ -1155,8 +1155,8 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     (c) => (/report_id: d\.reportId \|\| \(viewingOwn \? d\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a draft can be linked from someone else's calendar"]),
     (src) => src.replace("(viewingOwn ? d.draftId : undefined)", "d.draftId"));
   rule("the deadlines are part of every calendar answer", EV,
-    (c) => (/reportMirror\(auth, accountId, viewingOwn, w\),/.test(c) && /\.\.\.leave, \.\.\.reports\];/.test(c) ? [] : ["the mirror is computed but not sent"]),
-    (src) => src.replace("...leave, ...reports];", "...leave];"));
+    (c) => (/reportMirror\(auth, accountId, viewingOwn, w\),/.test(c) && /\.\.\.leave, \.\.\.reports[,;]/.test(c) ? [] : ["the mirror is computed but not sent"]),
+    (src) => src.replace("...leave, ...reports, ", "...leave, "));
   rule("nothing is read for the calendar before tracking starts", "src/lib/server/reports/obligations.ts",
     (c) => (/if \(!settings\.trackingFrom \|\| addDays\(toIso\.slice\(0, 10\), 1\) < settings\.trackingFrom\) return \[\];/.test(c) ? [] : ["deadlines can show before tracking starts"]),
     (src) => src.replace("if (!settings.trackingFrom || addDays(toIso.slice(0, 10), 1) < settings.trackingFrom) return [];", "if (addDays(toIso.slice(0, 10), 1) < (settings.trackingFrom ?? \"\")) return [];"));
@@ -2510,13 +2510,13 @@ console.log("\n§24 HR, Projects, Inventory and Finance: who reads how far, abou
   const byId = (xs: ReturnType<typeof normalizeSections>, id: string) => xs.find((x) => x.id === id)!;
 
   /* The catalog: the owner's four groups, whole */
-  eq([fam("hr").length, fam("projects").length, fam("inventory").length, fam("finance").length], [36, 20, 4, 6], "HR holds its 36 (31 new beside the five before), Projects 20, Inventory 4, Finance 6");
+  eq([fam("hr").length, fam("projects").length, fam("inventory").length, fam("finance").length], [37, 20, 4, 6], "HR holds its 37 (32 new beside the five before), Projects 20, Inventory 4, Finance 6");
   expect(["projects", "inventory", "finance"].every((f) => REPORT_FAMILIES.includes(f as never)), "the three new families are families");
   expect(fam("hr").every((t) => !!t.group && FAMILY_GROUPS.hr!.includes(t.group)) && fam("projects").every((t) => !!t.group && FAMILY_GROUPS.projects!.includes(t.group)),
     "every HR and Projects type shows under one of its family's groups");
   expect(Object.entries(FAMILY_GROUPS).every(([f, gs]) => gs!.every((g) => reportsT[`grp.${f}.${g}`]?.en && reportsT[`grp.${f}.${g}`]?.zh && reportsT[`grp.${f}.${g}`]?.ar)), "every group's heading speaks en / zh / ar");
   const newOnes = [...fam("hr"), ...fam("projects"), ...fam("inventory"), ...fam("finance")].filter((t) => !["hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview", "probation_review"].includes(t.key));
-  eq(newOnes.length, 61, "sixty-one new types (owner's picks 26 Sep 2026)");
+  eq(newOnes.length, 62, "sixty-two new types (owner's picks 26 Sep 2026 + hr_monthly_rating, 2026-10-07)");
   expect(newOnes.every((t) => t.app || t.hrOnly || t.payrollOnly), "no new type is offered to everyone: each needs its app, HR · create or «Payroll Reports»");
   expect(fam("projects").every((t) => t.app === "Projects") && fam("inventory").every((t) => t.app === "Inventory") && fam("finance").every((t) => t.app === "Finance" || (t.key === "fin_petty_cash" && t.app === "Expenses")),
     "a Projects type needs Projects, Inventory Inventory, Finance Finance — petty cash the Expenses app (the custodian is rarely an accountant)");

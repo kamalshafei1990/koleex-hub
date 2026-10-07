@@ -150,6 +150,7 @@ export const reportCommonT: Translations = {
   "tpl.hr_salary_review.name": { en: "Salary review and raises", zh: "薪资审查与调薪", ar: "مراجعة الرواتب والزيادات" },
   "tpl.hr_appraisal.name": { en: "Performance appraisal", zh: "绩效考核", ar: "تقييم الأداء" },
   "tpl.hr_appraisal_results.name": { en: "Appraisal results", zh: "考核结果", ar: "نتايج التقييمات" },
+  "tpl.hr_monthly_rating.name": { en: "Monthly rating", zh: "月度评级", ar: "التقييم الشهري" },
   "tpl.hr_training.name": { en: "Training plan and log", zh: "培训计划与记录", ar: "خطة وسجل التدريب" },
   "tpl.hr_skills.name": { en: "Skills inventory", zh: "技能盘点", ar: "مخزون المهارات" },
   "tpl.hr_behavior.name": { en: "Work behavior", zh: "职业行为", ar: "السلوك الوظيفي" },

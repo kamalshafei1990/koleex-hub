@@ -613,6 +613,13 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     data("kpis", "hr_kpis"), data("cost", "staff_cost"), t("summary", "text", true), t("highlights", "list"), t("next", "list"),
   ], M),
   hr("hr_headcount", "records", "building", [data("headcount", "headcount"), t("summary", "text", true)], M),
+  /* Monthly ratings (Phase 3, 2026-10-07): system-generated on finalize — one
+     per employee, sections written by the server from rating_summaries, never
+     by hand. Existing section ids only, so their labels and translations are
+     the ones the app already knows. */
+  hr("hr_monthly_rating", "performance", "award", [
+    t("summary", "text", true), t("skills", "list"), t("behavior", "list"), t("actions", "list"),
+  ], { confidential: true }),
   /* ── Projects (5C): starting, running, every project, closing. A report
      about one project reads its numbers; the projects the writer can see
      (the Projects app's own rule) when it covers them all. ── */

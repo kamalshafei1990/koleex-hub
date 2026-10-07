@@ -176,6 +176,10 @@ const words: Translations = {
   "tpl.hr_salary_review.s.budget.hint": { en: "What the raises add in a year, and whether the budget allows it.", zh: "调薪每年增加多少成本，预算是否允许。", ar: "الزيادات هتزوّد كام في السنة، والميزانية تسمح ولا لأ." },
 
   /* ── Phase 5C: performance ── */
+  "tpl.hr_monthly_rating.s.summary": { en: "This month at a glance", zh: "本月概览", ar: "الشهر ده في نظرة" },
+  "tpl.hr_monthly_rating.s.skills": { en: "Skills — score (required), change vs last month", zh: "技能——分数（要求），与上月对比", ar: "المهارات — الدرجة (المطلوب)، والفرق عن الشهر اللي فات" },
+  "tpl.hr_monthly_rating.s.behavior": { en: "Behavior — score (required), change vs last month", zh: "行为——分数（要求），与上月对比", ar: "السلوك — الدرجة (المطلوب)، والفرق عن الشهر اللي فات" },
+  "tpl.hr_monthly_rating.s.actions": { en: "How to improve next month", zh: "下月如何改进", ar: "إزاي تتحسن الشهر الجاي" },
   "tpl.hr_appraisal.s.employee": EMPLOYEE,
   "tpl.hr_appraisal.s.record": { en: "Appraisal record", zh: "考核记录", ar: "سجل التقييمات" },
   "tpl.hr_appraisal.s.scores": { en: "This quarter's rating", zh: "本季度评分", ar: "تقييم الربع ده" },

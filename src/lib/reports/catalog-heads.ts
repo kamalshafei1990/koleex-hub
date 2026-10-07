@@ -129,6 +129,7 @@ export const REPORT_HEADS: readonly ReportTemplateHead[] = [
   { key: "hr_safety_inspection", family: "hr", group: "records", icon: "hard-hat", cadence: "monthly" },
   { key: "hr_monthly", family: "hr", group: "records", icon: "newspaper", cadence: "monthly" },
   { key: "hr_headcount", family: "hr", group: "records", icon: "building", cadence: "monthly" },
+  { key: "hr_monthly_rating", family: "hr", group: "performance", icon: "award", cadence: null },
   { key: "prj_proposal", family: "projects", group: "start", icon: "bulb", cadence: null },
   { key: "prj_charter", family: "projects", group: "start", icon: "flag-checkered", cadence: null },
   { key: "prj_plan", family: "projects", group: "start", icon: "calendar", cadence: null },

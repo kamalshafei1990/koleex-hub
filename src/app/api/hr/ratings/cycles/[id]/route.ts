@@ -16,6 +16,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { logAudit } from "@/lib/server/audit";
 import { weightedScore } from "@/lib/skills/scoring";
+import { generateRatingReports, notifyRatingPublished } from "@/lib/server/ratings/publish";
 
 const MODULE = "HR";
 
@@ -197,11 +198,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { status: 422 },
       );
     }
-    detail = { summaries: result.summaries };
+    /* the documents are born with the finalize — one report per employee,
+       submitted and confidential from the first second (ratings/publish.ts) */
+    const { created } = await generateRatingReports(cycle, auth);
+    detail = { summaries: result.summaries, reports: created };
   }
 
   const stamp = action === "finalize" ? { finalized_at: new Date().toISOString() }
     : action === "publish" ? { published_at: new Date().toISOString() } : {};
+  if (action === "publish") await notifyRatingPublished(cycle);
   const { error } = await supabaseServer.from("rating_cycles")
     .update({ status: move.to, ...stamp, updated_at: new Date().toISOString() })
     .eq("id", id).eq("status", cycle.status); // optimistic: another finalize in flight loses
