@@ -1143,6 +1143,17 @@ input[type="number"]:not(.kx-spinner) {
    scrollbar. Transient by design — a permanent clip on the scroller would
    clip sticky/hover paint (the door's lesson). */
 html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
+/* A page whose height crosses the viewport mid-typing used to shift every
+   absolute-anchored control by the scrollbar's width (owner, 2026-10-08:
+   the search × jumped when hovered). The gutter is reserved always. */
+#main-scroll-container { scrollbar-gutter: stable; }
+/* Scroll anchoring must NOT compensate for the smart rail's shrink: the
+   rail's height is driven BY scrollTop, so an anchoring adjustment would
+   feed back into its own input and oscillate (the v1 fold looped exactly
+   like that, measured live). The rest of the page never shifts height in
+   a way anchoring was helping with — the live-search reflow is what the
+   stable gutter above already owns. */
+#main-scroll-container { overflow-anchor: none; }
 
 /* ── The header tab bar's selection GLIDES ───────────────────────────────
    The bar was named SlidingPillNav and did not slide: the dark fill lived on
@@ -3095,6 +3106,42 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    Below 640px the frame is off — the tiles run in one sideways row. The
    tiles' selection reuses .kx-rail-ind at the tile radius. */
 .kx-rail-ind--tile { border-radius: 0.75rem; }
+/* SMART RAIL v2 (owner, 2026-10-08, second brief): the strip SHRINKS with
+   the scroll — DeepSeek-header style — instead of folding away. ProductList
+   writes --kx-rail-p (0..1) and --kx-rail-h-full (measured px) on the nav
+   per scroll frame; everything below is pure calc off that variable, so the
+   motion is 1:1 with the finger and costs zero React renders.
+   · .kx-rail-full clips to a lerped height: full → one mini line.
+   · .kx-rail-stack overlays the big block and the mini row in one grid
+     cell; the big tiles fade/lift/scale out while the mini chips fade in.
+   · data-rail-mini (p > 0.6) flips pointer-events/visibility so the hidden
+     layer is never focusable nor clickable. */
+.kx-rail-full {
+  overflow: hidden;
+  /* Never declare --kx-rail-p HERE: a declaration on the element itself
+     outranks the value it inherits from the nav, and the scrub would read
+     0 forever (measured live: p=0.5 on the nav, opacity still 1). The
+     fallback belongs inside each var() call. */
+  max-height: calc(var(--kx-rail-h-mini, 40px) + (1 - var(--kx-rail-p, 0)) * (var(--kx-rail-h-full, 400px) - var(--kx-rail-h-mini, 40px)));
+}
+.kx-rail-stack { display: grid; }
+.kx-rail-stack > * { grid-area: 1 / 1; min-width: 0; }
+.kx-rail-big {
+  transform-origin: top center;
+  opacity: calc(1 - var(--kx-rail-p, 0) * 1.5);
+  translate: 0 calc(var(--kx-rail-p, 0) * -12px);
+  scale: calc(1 - var(--kx-rail-p, 0) * 0.08);
+}
+.kx-rail-mini {
+  opacity: calc((var(--kx-rail-p, 0) - 0.55) / 0.45);
+  visibility: hidden;
+  pointer-events: none;
+}
+nav[data-rail-mini] .kx-rail-mini { visibility: visible; pointer-events: auto; }
+nav[data-rail-mini] .kx-rail-big { visibility: hidden; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-rail-big, .kx-rail-mini { transition: none; }
+}
 .kx-sub-shelf {
   position: relative;
   --kx-shelf-line: var(--border-subtle);
