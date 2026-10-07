@@ -284,11 +284,11 @@ export default function ProductPickerModal({
         )}
       </div>
 
-      {/* pt-4, not less: the sticky search block above carries -mt-5, so its
+      {/* pt-5, not less: the sticky search block above carries -mt-5, so its
           painted (translucent) box extends ~20px BELOW its flow box — the
           first list item would slide under it and its top would read as
           clipped. The clearance matches the overhang exactly. */}
-      <div ref={listRef} className="min-h-[200px] pt-4" role="listbox" aria-label={t("picker.productTitle")}>
+      <div ref={listRef} className="min-h-[200px] pt-6" role="listbox" aria-label={t("picker.productTitle")}>
         {loading && (
           <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-[var(--text-dim)]" role="status" aria-live="polite">
             <SpinnerIcon className="h-4 w-4" />
