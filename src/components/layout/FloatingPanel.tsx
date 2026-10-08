@@ -208,8 +208,16 @@ export default function FloatingPanel() {
      conversation (it appears in the /ai sidebar), same markdown
      rendering. One rolling conversation is kept per device. */
   const FAB_CONV_KEY = "koleex-fab-ai-conv";
+  /* ONE THREAD, TWO WINDOWS (owner, 2026-10-08: "the AI in the floating
+     button … seems they are separated"). The private FAB key above made
+     the corner chat a different conversation from whatever /ai had open —
+     same brain, two threads. The app now publishes its open chat at
+     kx:ai:current-conv; the panel reads it FIRST (the FAB key stays only
+     as the migration fallback for threads started before this change), a
+     conversation the panel creates is published there too, and /ai opens
+     the same thread when it mounts fresh. */
+  const SHARED_CONV_KEY = "kx:ai:current-conv";
   const fabConvIdRef = useRef<string | null>(null);
-  const fabHistoryLoadedRef = useRef(false);
   const [sending, setSending] = useState(false);
 
   /* ── Contextual Copilot hints (Phase 1.7) ──
@@ -252,20 +260,23 @@ export default function FloatingPanel() {
     return () => window.removeEventListener("koleex:ai-open", handler as EventListener);
   }, []);
 
-  /* Restore the rolling FAB conversation (id + its history) the first
-     time the AI tab is shown after mount. 404 → start fresh. */
+  /* Restore the SHARED conversation (id + its history) every time the AI
+     tab opens — the id-compare is the gate, not a once-per-mount flag, so
+     switching chats inside /ai and then opening the corner panel swaps to
+     THAT thread. 404 → start fresh. */
   useEffect(() => {
-    if (!open || tab !== "ai" || fabHistoryLoadedRef.current) return;
-    fabHistoryLoadedRef.current = true;
-    try { fabConvIdRef.current = window.localStorage.getItem(FAB_CONV_KEY); } catch { /* ignore */ }
-    const id = fabConvIdRef.current;
-    if (!id) return;
+    if (!open || tab !== "ai") return;
+    let id: string | null = null;
+    try { id = window.localStorage.getItem(SHARED_CONV_KEY) ?? window.localStorage.getItem(FAB_CONV_KEY); } catch { /* ignore */ }
+    if (id === fabConvIdRef.current) return; // already on this thread
+    fabConvIdRef.current = id;
+    if (!id) { setAiMessages([]); return; }
     (async () => {
       try {
         const res = await fetch(`/api/ai/conversations/${id}`, { credentials: "include" });
         if (!res.ok) {
           fabConvIdRef.current = null;
-          try { window.localStorage.removeItem(FAB_CONV_KEY); } catch { /* ignore */ }
+          try { window.localStorage.removeItem(SHARED_CONV_KEY); window.localStorage.removeItem(FAB_CONV_KEY); } catch { /* ignore */ }
           return;
         }
         const json = (await res.json()) as {
@@ -277,8 +288,11 @@ export default function FloatingPanel() {
             role: m.role === "assistant" ? ("ai" as const) : ("user" as const),
             text: m.content,
           }));
-        if (restored.length > 0) setAiMessages(restored);
-      } catch { /* offline — start empty */ }
+        /* An empty thread IS a state too — a shared id whose messages were
+           cleared must clear the panel, not leave the previous thread's
+           bubbles on screen. */
+        setAiMessages(restored);
+      } catch { /* offline — keep whatever is on screen */ }
     })();
   }, [open, tab]);
 
@@ -556,6 +570,9 @@ export default function FloatingPanel() {
           }
           fabConvIdRef.current = convId;
           try { window.localStorage.setItem(FAB_CONV_KEY, convId); } catch { /* ignore */ }
+          /* Publish to /ai — the corner panel and the app now point at the
+             same thread (see SHARED_CONV_KEY above). */
+          try { window.localStorage.setItem(SHARED_CONV_KEY, convId); } catch { /* ignore */ }
         }
         /* Streaming fetch (Phase 2). The server emits SSE events:
              start | delta | end

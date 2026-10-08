@@ -822,6 +822,20 @@ export default function KoleexAiApp() {
     [revokeMessagePreviews, syncUrl],
   );
 
+  /* SHARED WITH THE FLOATING PANEL (owner, 2026-10-08: "Koleex ai in the
+     floating button … it seems they are separated"). The corner chat kept
+     its own private conversation key (koleex-fab-ai-conv), so /ai and the
+     floater ran two different threads off the same brain. The open chat id
+     is now published at kx:ai:current-conv — the floater reads it first,
+     and both surfaces continue ONE thread. WRITE-ONLY here: removal is
+     startNewChat's job, because on mount activeId is briefly null while
+     the restore below is still reading the key — removing it in this
+     effect would make the restore find nothing (measured race). */
+  useEffect(() => {
+    if (!activeId) return;
+    try { window.localStorage.setItem("kx:ai:current-conv", activeId); } catch { /* ignore */ }
+  }, [activeId]);
+
   /* ── New chat — an empty screen; the row is created on the first send ── */
   const startNewChat = useCallback(async () => {
     setLibraryOpen(false);
@@ -835,6 +849,9 @@ export default function KoleexAiApp() {
        folder the screen is standing in, see createConversation. */
     openReqRef.current = "";
     setActiveId(null);
+    /* The shared pointer follows the user's intent: a fresh screen here
+       means the floating panel's next open starts fresh too. */
+    try { window.localStorage.removeItem("kx:ai:current-conv"); } catch { /* ignore */ }
     revokeMessagePreviews();
     setMessages([]);
     setInput("");
@@ -871,6 +888,20 @@ export default function KoleexAiApp() {
       const rest = params.toString();
       try { window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`); } catch { /* no history */ }
       void startNewChat().then(() => sendRef.current(copy.prompts[0], false));
+    }
+    /* THE FLOATING PANEL'S THREAD FOLLOWS YOU IN (owner, 2026-10-08: the
+       corner chat "seems separated" from this app). Opening /ai fresh with
+       no ?c= used to land on an empty welcome while the floater held a
+       live thread elsewhere. The shared pointer opens the SAME
+       conversation here, so both surfaces are one app. */
+    if (!c && params.get("ask") !== "brief") {
+      try {
+        const shared = window.localStorage.getItem("kx:ai:current-conv");
+        if (shared && /^[0-9a-f-]{8,}$/i.test(shared)) {
+          fromHistoryRef.current = true;
+          try { void openConversation(shared); } finally { fromHistoryRef.current = false; }
+        }
+      } catch { /* ignore */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a one-time read of the address at mount
   }, []);
