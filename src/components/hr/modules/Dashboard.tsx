@@ -92,7 +92,7 @@ export default function DashboardModule({ t }: HRModuleProps) {
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── KPI cards — canonical monochrome KpiCard, same as every other app ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard

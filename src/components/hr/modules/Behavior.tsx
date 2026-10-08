@@ -186,7 +186,7 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
   const toggleCat = (id: string) => setCollapsed((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <BehaviorSliderStyles />
 
       {/* Reports strip */}

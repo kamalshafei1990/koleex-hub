@@ -140,7 +140,7 @@ export default function Documents({ employees, t }: HRModuleProps) {
 
   /* ── Render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">

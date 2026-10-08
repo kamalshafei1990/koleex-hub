@@ -182,7 +182,7 @@ export default function RatingsModule({ employees, t, lang }: HRModuleProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       {confirmDialog}
       {/* cycle strip */}
       <div className="flex items-center gap-2 flex-wrap">

@@ -138,7 +138,7 @@ export default function ReportsModule({ employees, t }: HRModuleProps) {
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Section title */}
       <div className={sectionTitleCls}>
         <BarChart3Icon size={14} className="text-[var(--text-dim)]" />

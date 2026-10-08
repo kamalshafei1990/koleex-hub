@@ -169,7 +169,7 @@ export default function SkillsModule({ employees, t, lang }: HRModuleProps) {
   const periodLabel = period === "weekly" ? t("hr.skills.weekly") : period === "monthly" ? t("hr.skills.monthly") : t("hr.skills.annual");
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <style jsx global>{`
         .kx-skill-slider {
           -webkit-appearance: none; appearance: none; height: 6px; border-radius: 9999px;

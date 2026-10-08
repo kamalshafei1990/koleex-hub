@@ -242,7 +242,7 @@ export default function AttendanceModule({ employees, t, lang }: HRModuleProps) 
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* Header */}
       {/* items-start: the date picker's calendar opens IN FLOW under it, and
           a centred row would slide every other control down to its middle. */}

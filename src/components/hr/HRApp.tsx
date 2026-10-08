@@ -228,10 +228,15 @@ export default function HRApp() {
   const ActiveModule = MODULE_MAP[activeTab];
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col max-w-[100vw]">
 
-      {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════ */}
-      <div className="shrink-0 px-4 sm:px-5 pt-4 sm:pt-5">
+      {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════
+          STICKY (owner, 2026-10-08: the HR page "can't scroll down" — the app
+          used a nested scroller, the ONLY one in the Hub, and the in-app
+          browser never forwarded wheel to it. The page now flows through
+          #main-scroll-container like every other app; the header stays put
+          via position:sticky, the same pattern /product-data uses. */}
+      <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 sm:px-5 pt-4 sm:pt-5">
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
@@ -250,11 +255,11 @@ export default function HRApp() {
       </div>
 
       {/* ═══════════ CONTENT ═══════════ */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div>
         {empLoading ? (
           <BrandLoading className="h-full min-h-[40vh]" />
         ) : (
-          <div key={activeTab} className={tabMotion}>
+          <div key={activeTab} className={`${tabMotion} flex flex-col`}>
             <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
           </div>
         )}
