@@ -2901,9 +2901,14 @@ export default function Quotations() {
   useEffect(() => {
     if (view !== "list" || !isSuperAdmin) return;
     let alive = true;
-    fetch("/api/quotations/compact-images", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { pending?: number } | null) => { if (alive && j) setCompactPending(Number(j.pending) || 0); })
+    /* Coalesced + 60 s reuse (lib/client-cache): StrictMode mounts this
+       twice and every list visit re-asked it — measured ×2 at 1.2-1.8 s
+       each from China for a housekeeping COUNT the owner glances at. The
+       compaction runner below invalidates after it drains the queue. */
+    void import("@/lib/client-cache").then(({ cachedGet }) =>
+      cachedGet<{ pending?: number }>("/api/quotations/compact-images", 60_000),
+    )
+      .then((j) => { if (alive && j) setCompactPending(Number(j.pending) || 0); })
       .catch(() => {});
     return () => { alive = false; };
   }, [view, isSuperAdmin]);
@@ -2923,6 +2928,9 @@ export default function Quotations() {
       }
       setCompactPending(0);
       docWarm.clear();
+      /* The count is cached for 60 s now — drain means the next list visit
+         must recount, not reuse the pre-compaction number. */
+      void import("@/lib/client-cache").then(({ invalidateCachedGet }) => invalidateCachedGet("/api/quotations/compact-images"));
       showToast(t("toast.compactDone").replace("{n}", String(total)));
     } catch (e) {
       showToast(t("toast.compactFail").replace("{err}", humanizeError(e)), "error");
