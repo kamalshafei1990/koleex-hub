@@ -782,3 +782,31 @@ export function isMemoryIntentQuery(msg: string): boolean {
     /记住|保存|别忘|加入知识库/.test(msg)
   );
 }
+
+/* ─── Document-making detector ────────────────────────────────────
+   "make me a PDF packing list", "اعملي مستند", "导出一个pdf": the answer
+   is a FILE that does not exist yet, which only generate_document can
+   make — and the tool-less lanes would answer with a paragraph, or worse
+   (observed live, 2026-10-08): the model re-shapes an EARLIER turn's file
+   link with an invented UUID and hands the user a 404. Same law as the
+   picture detector: a false positive costs one tool-loop turn, a false
+   negative is a wrong answer. A creation/export VERB and a document NOUN
+   are both required, so "the pdf you sent" and "make a task" do not fire.
+   Deliberately EXCLUDES the bare word "report" — work reports (the
+   Reports app) own that word and have their own tools. */
+export function isDocCreationRequest(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s) return false;
+  /* English: verb-led */
+  if (/\b(make|create|generate|export|download|produce|prepare|build|compile|convert|turn|redesign|reformat|format|organise|organize)\b[^.?!]{0,40}\b(pdf|document|doc|packing\s+list|price\s+list|data\s?sheet|brochure|certificate)\b/.test(s)) return true;
+  /* English: noun-led — "a pdf of…", "a packing list for…" */
+  if (/\b(a|an|the)\s+(pdf|packing\s+list|price\s+list|data\s?sheet|brochure)\s+(of|for|from)\b/.test(s)) return true;
+  /* Arabic: verb-led */
+  if (/(اعمل|اعملي|اعمللي|جهز|جهزلي|طلع|طلعلي|اطلع|اطلعلي|صمم|صممي|حول|حوّل|حوّلي|نظم|نظملي|ولد|ولّد|صدر|صدّر|اصدر|اكتب|اكتبي)[^.?!]{0,30}(pdf|بي دي اف|مستند|وثيقة|ملف|قائمة تعبئة|باكينج|قائمة أسعار|قائمة اسعار|شهادة)/.test(msg)) return true;
+  /* Arabic: document word + any creation verb anywhere (follow-ups like
+     "حولها pdf") */
+  if (/(pdf|بي دي اف|مستند|وثيقة|قائمة تعبئة|باكينج)/.test(s) && /(اعمل|جهز|طلع|حول|حوّل|صمم|نظم|ولّ?د|صدّ?ر|اصدر|اكتب)/.test(msg)) return true;
+  /* Chinese */
+  if (/(生成|制作|做|导出|创建|整理|编写|转换)(一份|一个|一張|张|个|份)?[^。?!]{0,20}(pdf|文档|文件|装箱单|报价单|证书)/i.test(msg)) return true;
+  return false;
+}

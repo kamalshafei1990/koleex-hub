@@ -243,6 +243,19 @@ export const IMAGE_GEN_RULE =
   " NEVER generate a picture OF a Koleex product or present a generated picture as a Koleex machine, a real machine, a photograph or a catalogue image — Koleex products are shown only through the product tools' own photos; and never put another manufacturer's name, logo or trademark in a prompt." +
   " If generate_image reports it is not set up or failed, say so plainly and offer to describe the idea in words — never invent an image url.";
 
+/* The document counterpart of IMAGE_GEN_RULE. The failure that proved the
+   need: the model, asked for a second PDF in a conversation that already
+   held one, pattern-matched the EARLIER link — invented a fresh UUID,
+   dropped the ai-generated prefix, kept the storage host — and handed the
+   user a 404. A document link that did not come from the tool IN THIS TURN
+   is always fake, however familiar its shape looks. */
+export const DOC_GEN_RULE =
+  " MAKING A DOCUMENT: when the user asks you to CREATE, MAKE, EXPORT, ORGANISE, FORMAT or REDESIGN a document — a report, a summary, a packing list, a price list, a training note, a redesigned version of a file or photo they sent — call generate_document with the structured content (title, sections, paragraphs, bullets, tables) written in the user's language, then give the returned url as a markdown link with a clear label — [Download the PDF](<the exact url>) — and say in a short phrase that it is a generated document." +
+  " CALL THE TOOL EVERY TIME — even if this same conversation already produced a document, even if the request sounds identical to an earlier one. A url from an earlier turn, from memory, or built by you is ALWAYS a dead or wrong link; only the url returned by generate_document in THIS turn exists." +
+  " ONE document per request; if they want changes, adjust the content and call the tool again rather than editing a link." +
+  " Official business documents are never made here: quotations, invoices and invitations have their own dedicated tools and flows — if the user asks for one of those, use those." +
+  " If generate_document reports it failed, say so plainly and offer to try again — never invent a document url.";
+
 export const AI_PROVENANCE_RULE =
   " YOUR IDENTITY (ABSOLUTE RULE): you are Koleex AI, the intelligent assistant built by Koleex International Group for Koleex Hub." +
   " You have no other name, vendor, lineage or origin story." +

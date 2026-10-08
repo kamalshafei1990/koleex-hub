@@ -100,6 +100,7 @@ import {
   isWorkDataQuery,
   isLiveInfoQuery,
   isImageCreationRequest,
+  isDocCreationRequest,
   isMemoryIntentQuery,
 } from "@/lib/server/ai/core/decide-turn";
 
@@ -281,6 +282,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     isLiveInfoQuery(userMessage) ||
     /* A picture to MAKE needs generate_image, which only the tool loop has. */
     isImageCreationRequest(userMessage) ||
+    /* A document to MAKE needs generate_document for the same reason —
+       on a fast lane the model invents the file link (observed live). */
+    isDocCreationRequest(userMessage) ||
     isMemoryIntentQuery(userMessage);
   const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";

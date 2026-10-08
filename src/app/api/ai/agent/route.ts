@@ -55,6 +55,7 @@ import {
   isLiveInfoQuery,
   isWorldFactQuery,
   isImageCreationRequest,
+  isDocCreationRequest,
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
@@ -700,6 +701,10 @@ export async function POST(req: Request) {
             (isWorldFactQuery(normalizedContent) && !worldFactOnGeneral) ||
             /* "Draw me…" needs generate_image, which only the tool loop has. */
             isImageCreationRequest(normalizedContent) ||
+            /* "Make me a PDF…" needs generate_document for the same reason —
+               on a fast lane the model invents the file link (observed live:
+               a hallucinated storage url 404'd for the owner). */
+            isDocCreationRequest(normalizedContent) ||
             body.web_search === true;
           /* Memory/teaching intents ("remember this", "save for the team",
              "احفظ", "تذكر", "记住") MUST reach the tool loop — the fast
