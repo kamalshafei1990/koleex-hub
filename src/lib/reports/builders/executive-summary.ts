@@ -24,6 +24,8 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
+import { inChunks } from "@/lib/server/in-chunks";
 import type {
   ReportBuildContext,
   ReportColumn,
@@ -84,30 +86,30 @@ export async function buildExecutiveSummary(ctx: ReportBuildContext): Promise<Re
   const tenant = await loadTenant(ctx.tenantId);
 
   const [ordersRes, supplierLinesRes, expensesRes, paymentsRes, accountsRes] = await Promise.all([
-    supabaseServer
+    allRows(supabaseServer
       .from("finance_orders")
       .select("id, order_no, customer_id, customer_name, order_date, selling_price, tax_refund_value, financial_charges, currency, status, payment_status")
       .eq("tenant_id", ctx.tenantId)
       .gte("order_date", period.from)
       .lte("order_date", period.to)
-      .limit(2000),
+      .order("id"), "orders"),
     /* Supplier lines for orders in the window — pulled by order id
        after we know the order set. */
     Promise.resolve({ data: [] as SupplierLine[] }),
-    supabaseServer
+    allRows(supabaseServer
       .from("finance_expenses")
       .select("amount, currency, payment_status, expense_date, linked_order_id, linked_supplier_id")
       .eq("tenant_id", ctx.tenantId)
       .gte("expense_date", period.from)
       .lte("expense_date", period.to)
-      .limit(2000),
-    supabaseServer
+      .order("id"), "expenses"),
+    allRows(supabaseServer
       .from("finance_payments")
       .select("amount, currency, direction, status, party_type, party_id, payment_date")
       .eq("tenant_id", ctx.tenantId)
       .gte("payment_date", period.from)
       .lte("payment_date", period.to)
-      .limit(2000),
+      .order("id"), "payments"),
     supabaseServer
       .from("finance_bank_accounts")
       .select("*")
@@ -122,11 +124,13 @@ export async function buildExecutiveSummary(ctx: ReportBuildContext): Promise<Re
   /* Second hop — supplier lines for the orders in the window. */
   let supplierLines: SupplierLine[] = [];
   if (orders.length > 0) {
-    const { data: slData } = await supabaseServer
+    /* In chunks: a few hundred order ids in one URL fail before they reach
+       the database, and the supplier costs would read as zero. */
+    const { data: slData } = await inChunks<SupplierLine>(orders.map((o) => o.id), (chunk) => supabaseServer
       .from("finance_order_suppliers")
       .select("order_id, supplier_id, supplier_name, supplier_cost, paid_amount, payment_status, due_date")
       .eq("tenant_id", ctx.tenantId)
-      .in("order_id", orders.map((o) => o.id));
+      .in("order_id", chunk));
     supplierLines = (slData ?? []) as SupplierLine[];
   }
   void supplierLinesRes;

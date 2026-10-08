@@ -238,13 +238,3 @@ export function pickLocalAnswer(
   return ans.en;
 }
 
-/** True if the query resolves to a local glossary answer. Cheaper
- *  than findLocalAnswer when the caller only needs the yes/no. */
-export function hasLocalAnswer(query: string): boolean {
-  return findLocalAnswer(query) !== null;
-}
-
-/** Number of entries — exposed for diagnostics / tests. */
-export function localKnowledgeSize(): number {
-  return Object.keys(GLOSSARY).length;
-}

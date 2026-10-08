@@ -1,9 +1,13 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   identity — resolves "which account is the current user" in both auth modes.
+   identity — resolves "which account is the current user".
 
-   Legacy mode (the default until Supabase Auth is flipped on):
+   (A Supabase-Auth mode, resolving `accounts.auth_user_id = auth.users.id`,
+   was planned here and never built; the flag behind it was retired with
+   SupabaseGate on 26/09/2026.)
+
+   Legacy mode:
      There is no real session. The admin password gate just toggles a
      sessionStorage flag. We still want the MainHeader / UserMenu to show a
      real name + avatar + role for the person using the hub, so we let them
@@ -11,19 +15,13 @@
      localStorage. On first load we auto-pick if exactly one internal account
      exists (common case for a new install).
 
-   Supabase mode (deferred — plumbed but inactive):
-     When `isSupabaseAuthEnabled()` is true, the chosen identity is instead
-     resolved by looking up `accounts.auth_user_id = auth.users.id`. That
-     lookup is not yet implemented here — the hook falls back to the legacy
-     localStorage path so UI can still render during the transition period.
-
    Usage:
      const { account, loading, refresh } = useCurrentAccount();
      const accountId = getCurrentAccountIdSync(); // synchronous read
      setCurrentAccountId("uuid");
 --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { clearScopeContextCache } from "./scope";
 
@@ -87,6 +85,36 @@ export function getCurrentAccountIdSync(): string | null {
   } catch {
     return null;
   }
+}
+
+/* Reactive twin of getCurrentAccountIdSync.
+ *
+ * The sync getter is a ONE-SHOT read, and a component that calls it at render
+ * without subscribing is stuck with whatever storage held at first paint. That
+ * is a FALSE EMPTY waiting to happen: the id is written asynchronously (the
+ * auto-pick inside useCurrentAccount below, or a sign-in in another tab), so a
+ * page that filters by "me" — the To-do Assignment Report is exactly this —
+ * can render before the id exists, show "No assigned tasks in this period",
+ * and never recover, because nothing re-renders it when the id lands. A reload
+ * is the only cure, and the operator has no way to know that.
+ *
+ * Both events matter: IDENTITY_EVENT is dispatched for same-tab changes (the
+ * `storage` event deliberately does not fire in the tab that wrote), and
+ * `storage` covers a sign-in or account switch in another tab. */
+function subscribeToIdentity(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(IDENTITY_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(IDENTITY_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+export function useCurrentAccountId(): string | null {
+  /* Server snapshot is null: the id lives in localStorage, which SSR cannot
+     see, and returning anything else would hydrate a mismatch. */
+  return useSyncExternalStore(subscribeToIdentity, getCurrentAccountIdSync, () => null);
 }
 
 export function setCurrentAccountId(id: string | null): void {

@@ -82,28 +82,39 @@ export type InvitationLetter = {
 
 /* ── vocabulary ──────────────────────────────────────────────────────────── */
 
-export const PURPOSES: { value: InvitationPurpose; en: string; cn: string }[] = [
-  { value: "exhibition", en: "Visit our booth at an exhibition", cn: "参观我司展位" },
-  { value: "meeting",    en: "Business meeting and cooperation discussion", cn: "商务洽谈与合作交流" },
-  { value: "factory",    en: "Factory visit and machine inspection",        cn: "工厂考察与设备验收" },
-  { value: "training",   en: "Technical training and machine collection",   cn: "技术培训与设备提货" },
+export const PURPOSES: { value: InvitationPurpose; en: string; cn: string; ar: string }[] = [
+  { value: "exhibition", en: "Visit our booth at an exhibition", cn: "参观我司展位", ar: "زيارة جناحنا في معرض" },
+  { value: "meeting",    en: "Business meeting and cooperation discussion", cn: "商务洽谈与合作交流", ar: "اجتماع تجاري ومناقشة تعاون" },
+  { value: "factory",    en: "Factory visit and machine inspection",        cn: "工厂考察与设备验收", ar: "زيارة مصنع ومعاينة ماكينات" },
+  { value: "training",   en: "Technical training and machine collection",   cn: "技术培训与设备提货", ar: "تدريب فني واستلام ماكينات" },
 ];
 
-/** Cities Koleex actually hosts visitors in. Free text is still allowed. */
-export const COMMON_CITIES: { en: string; cn: string }[] = [
-  { en: "Taizhou",   cn: "台州" },
-  { en: "Wenzhou",   cn: "温州" },
-  { en: "Hangzhou",  cn: "杭州" },
-  { en: "Ningbo",    cn: "宁波" },
-  { en: "Shanghai",  cn: "上海" },
-  { en: "Yiwu",      cn: "义乌" },
-  { en: "Guangzhou", cn: "广州" },
-  { en: "Shenzhen",  cn: "深圳" },
-  { en: "Beijing",   cn: "北京" },
-  { en: "Qingdao",   cn: "青岛" },
+/** Cities Koleex hosts visitors in — the chips on the form. en is what the
+ *  letter prints (via cityCn for the Chinese page); cn/ar are display only. */
+export const COMMON_CITIES: { en: string; cn: string; ar: string }[] = [
+  { en: "Taizhou",   cn: "台州", ar: "تايتشو" },
+  { en: "Wenzhou",   cn: "温州", ar: "ونتشو" },
+  { en: "Hangzhou",  cn: "杭州", ar: "هانغتشو" },
+  { en: "Ningbo",    cn: "宁波", ar: "نينغبو" },
+  { en: "Shanghai",  cn: "上海", ar: "شنغهاي" },
+  { en: "Yiwu",      cn: "义乌", ar: "ييوو" },
+  { en: "Guangzhou", cn: "广州", ar: "قوانغتشو" },
+  { en: "Shenzhen",  cn: "深圳", ar: "شينزين" },
+  { en: "Beijing",   cn: "北京", ar: "بكين" },
+  { en: "Qingdao",   cn: "青岛", ar: "تشينغداو" },
+  { en: "Suzhou",    cn: "苏州", ar: "سوتشو" },
+  { en: "Nanjing",   cn: "南京", ar: "نانجينغ" },
+  { en: "Xiamen",    cn: "厦门", ar: "شيامن" },
+  { en: "Foshan",    cn: "佛山", ar: "فوشان" },
+  { en: "Dongguan",  cn: "东莞", ar: "دونغقوان" },
+  { en: "Zhongshan", cn: "中山", ar: "تشونغشان" },
+  { en: "Shaoxing",  cn: "绍兴", ar: "شاوشينغ" },
+  { en: "Jiaxing",   cn: "嘉兴", ar: "جياشينغ" },
+  { en: "Tianjin",   cn: "天津", ar: "تيانجين" },
+  { en: "Chengdu",   cn: "成都", ar: "تشنغدو" },
+  { en: "Dalian",    cn: "大连", ar: "داليان" },
+  { en: "Hong Kong", cn: "香港", ar: "هونغ كونغ" },
 ];
-
-const CITY_CN = new Map(COMMON_CITIES.map((c) => [c.en.toLowerCase(), c.cn]));
 
 /** Chinese name for a city, falling back to the English one when unknown —
  *  a city we don't have a translation for must still appear in the letter. */
@@ -141,6 +152,169 @@ const COUNTRY_CN: Record<string, string> = {
 export function countryCn(code: string | null | undefined, en: string | null | undefined): string {
   const key = (code ?? "").trim().toUpperCase().slice(0, 2);
   return COUNTRY_CN[key] ?? (en ?? "");
+}
+
+/* The nationality / country dropdowns — the owner's ask: pick from a list,
+   never type. Names are what prints on the letter; codes drive the Chinese
+   wording. Sorted here once so every dropdown shows the same order. */
+export const COUNTRIES: { name: string; code: string }[] = [
+  { name: "Afghanistan", code: "AF" }, { name: "Albania", code: "AL" },
+  { name: "Algeria", code: "DZ" }, { name: "Angola", code: "AO" },
+  { name: "Argentina", code: "AR" }, { name: "Armenia", code: "AM" },
+  { name: "Australia", code: "AU" }, { name: "Austria", code: "AT" },
+  { name: "Azerbaijan", code: "AZ" }, { name: "Bahrain", code: "BH" },
+  { name: "Bangladesh", code: "BD" }, { name: "Belarus", code: "BY" },
+  { name: "Belgium", code: "BE" }, { name: "Benin", code: "BJ" },
+  { name: "Bolivia", code: "BO" }, { name: "Bosnia and Herzegovina", code: "BA" },
+  { name: "Botswana", code: "BW" }, { name: "Brazil", code: "BR" },
+  { name: "Bulgaria", code: "BG" }, { name: "Burkina Faso", code: "BF" },
+  { name: "Cambodia", code: "KH" }, { name: "Cameroon", code: "CM" },
+  { name: "Canada", code: "CA" }, { name: "Chad", code: "TD" },
+  { name: "Chile", code: "CL" }, { name: "China", code: "CN" },
+  { name: "Colombia", code: "CO" }, { name: "Congo (DR)", code: "CD" },
+  { name: "Costa Rica", code: "CR" }, { name: "Croatia", code: "HR" },
+  { name: "Cuba", code: "CU" }, { name: "Cyprus", code: "CY" },
+  { name: "Czech Republic", code: "CZ" }, { name: "Denmark", code: "DK" },
+  { name: "Djibouti", code: "DJ" }, { name: "Dominican Republic", code: "DO" },
+  { name: "Ecuador", code: "EC" }, { name: "Egypt", code: "EG" },
+  { name: "El Salvador", code: "SV" }, { name: "Eritrea", code: "ER" },
+  { name: "Estonia", code: "EE" }, { name: "Ethiopia", code: "ET" },
+  { name: "Finland", code: "FI" }, { name: "France", code: "FR" },
+  { name: "Gabon", code: "GA" }, { name: "Gambia", code: "GM" },
+  { name: "Georgia", code: "GE" }, { name: "Germany", code: "DE" },
+  { name: "Ghana", code: "GH" }, { name: "Greece", code: "GR" },
+  { name: "Guatemala", code: "GT" }, { name: "Guinea", code: "GN" },
+  { name: "Honduras", code: "HN" }, { name: "Hungary", code: "HU" },
+  { name: "Iceland", code: "IS" }, { name: "India", code: "IN" },
+  { name: "Indonesia", code: "ID" }, { name: "Iran", code: "IR" },
+  { name: "Iraq", code: "IQ" }, { name: "Ireland", code: "IE" },
+  { name: "Israel", code: "IL" }, { name: "Italy", code: "IT" },
+  { name: "Ivory Coast", code: "CI" }, { name: "Jamaica", code: "JM" },
+  { name: "Japan", code: "JP" }, { name: "Jordan", code: "JO" },
+  { name: "Kazakhstan", code: "KZ" }, { name: "Kenya", code: "KE" },
+  { name: "Kuwait", code: "KW" }, { name: "Kyrgyzstan", code: "KG" },
+  { name: "Laos", code: "LA" }, { name: "Latvia", code: "LV" },
+  { name: "Lebanon", code: "LB" }, { name: "Liberia", code: "LR" },
+  { name: "Libya", code: "LY" }, { name: "Lithuania", code: "LT" },
+  { name: "Luxembourg", code: "LU" }, { name: "Madagascar", code: "MG" },
+  { name: "Malawi", code: "MW" }, { name: "Malaysia", code: "MY" },
+  { name: "Maldives", code: "MV" }, { name: "Mali", code: "ML" },
+  { name: "Malta", code: "MT" }, { name: "Mauritania", code: "MR" },
+  { name: "Mauritius", code: "MU" }, { name: "Mexico", code: "MX" },
+  { name: "Moldova", code: "MD" }, { name: "Mongolia", code: "MN" },
+  { name: "Morocco", code: "MA" }, { name: "Mozambique", code: "MZ" },
+  { name: "Myanmar", code: "MM" }, { name: "Namibia", code: "NA" },
+  { name: "Nepal", code: "NP" }, { name: "Netherlands", code: "NL" },
+  { name: "New Zealand", code: "NZ" }, { name: "Nicaragua", code: "NI" },
+  { name: "Niger", code: "NE" }, { name: "Nigeria", code: "NG" },
+  { name: "North Macedonia", code: "MK" }, { name: "Norway", code: "NO" },
+  { name: "Oman", code: "OM" }, { name: "Pakistan", code: "PK" },
+  { name: "Palestine", code: "PS" }, { name: "Panama", code: "PA" },
+  { name: "Paraguay", code: "PY" }, { name: "Peru", code: "PE" },
+  { name: "Philippines", code: "PH" }, { name: "Poland", code: "PL" },
+  { name: "Portugal", code: "PT" }, { name: "Qatar", code: "QA" },
+  { name: "Romania", code: "RO" }, { name: "Russia", code: "RU" },
+  { name: "Rwanda", code: "RW" }, { name: "Saudi Arabia", code: "SA" },
+  { name: "Senegal", code: "SN" }, { name: "Serbia", code: "RS" },
+  { name: "Sierra Leone", code: "SL" }, { name: "Singapore", code: "SG" },
+  { name: "Slovakia", code: "SK" }, { name: "Slovenia", code: "SI" },
+  { name: "Somalia", code: "SO" }, { name: "South Africa", code: "ZA" },
+  { name: "South Korea", code: "KR" }, { name: "South Sudan", code: "SS" },
+  { name: "Spain", code: "ES" }, { name: "Sri Lanka", code: "LK" },
+  { name: "Sudan", code: "SD" }, { name: "Sweden", code: "SE" },
+  { name: "Switzerland", code: "CH" }, { name: "Syria", code: "SY" },
+  { name: "Taiwan", code: "TW" }, { name: "Tajikistan", code: "TJ" },
+  { name: "Tanzania", code: "TZ" }, { name: "Thailand", code: "TH" },
+  { name: "Togo", code: "TG" }, { name: "Tunisia", code: "TN" },
+  { name: "Turkey", code: "TR" }, { name: "Turkmenistan", code: "TM" },
+  { name: "Uganda", code: "UG" }, { name: "Ukraine", code: "UA" },
+  { name: "United Arab Emirates", code: "AE" }, { name: "United Kingdom", code: "GB" },
+  { name: "United States", code: "US" }, { name: "Uruguay", code: "UY" },
+  { name: "Uzbekistan", code: "UZ" }, { name: "Venezuela", code: "VE" },
+  { name: "Vietnam", code: "VN" }, { name: "Yemen", code: "YE" },
+  { name: "Zambia", code: "ZM" }, { name: "Zimbabwe", code: "ZW" },
+];
+
+/* Arrival cities — mainland cities with INTERNATIONAL airports, the owner's
+   list plus the majors. Each carries its Chinese name because the letter
+   prints 由上海入境; a city without one would leave English mid-sentence. */
+export const ARRIVAL_CITIES: { en: string; cn: string; ar: string }[] = [
+  { en: "Shanghai", cn: "上海", ar: "شنغهاي" }, { en: "Beijing", cn: "北京", ar: "بكين" },
+  { en: "Guangzhou", cn: "广州", ar: "قوانغتشو" }, { en: "Shenzhen", cn: "深圳", ar: "شينزين" },
+  { en: "Hangzhou", cn: "杭州", ar: "هانغتشو" }, { en: "Ningbo", cn: "宁波", ar: "نينغبو" },
+  { en: "Wenzhou", cn: "温州", ar: "ونتشو" }, { en: "Nanjing", cn: "南京", ar: "نانجينغ" },
+  { en: "Xiamen", cn: "厦门", ar: "شيامن" }, { en: "Fuzhou", cn: "福州", ar: "فوتشو" },
+  { en: "Qingdao", cn: "青岛", ar: "تشينغداو" }, { en: "Tianjin", cn: "天津", ar: "تيانجين" },
+  { en: "Chengdu", cn: "成都", ar: "تشنغدو" }, { en: "Chongqing", cn: "重庆", ar: "تشونغتشينغ" },
+  { en: "Wuhan", cn: "武汉", ar: "ووهان" }, { en: "Changsha", cn: "长沙", ar: "تشانغشا" },
+  { en: "Zhengzhou", cn: "郑州", ar: "تشنغتشو" }, { en: "Xi'an", cn: "西安", ar: "شيان" },
+  { en: "Kunming", cn: "昆明", ar: "كونمينغ" }, { en: "Guilin", cn: "桂林", ar: "قويلين" },
+  { en: "Haikou", cn: "海口", ar: "هايكو" }, { en: "Sanya", cn: "三亚", ar: "سانيا" },
+  { en: "Harbin", cn: "哈尔滨", ar: "هاربين" }, { en: "Shenyang", cn: "沈阳", ar: "شنيانغ" },
+  { en: "Dalian", cn: "大连", ar: "داليان" }, { en: "Jinan", cn: "济南", ar: "جينان" },
+  { en: "Hong Kong", cn: "香港", ar: "هونغ كونغ" }, { en: "Macau", cn: "澳门", ar: "ماكاو" },
+];
+
+const CITY_CN = new Map(
+  [...COMMON_CITIES, ...ARRIVAL_CITIES].map((c) => [c.en.toLowerCase(), c.cn]),
+);
+
+/* STANDING RULE (owner): every country/nationality dropdown carries the
+   country FLAG. <option> cannot render images, so the flag is the emoji
+   derived from the ISO code — two regional-indicator symbols. */
+export function flagEmoji(code: string): string {
+  const cc = code.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+}
+
+/* STANDING RULE (owner): dropdown CONTENTS are translated, not just their
+   labels. For countries the browser already knows every name in every
+   language — Intl.DisplayNames — so there is no 150×3 table to maintain. */
+export function countryDisplayName(code: string, fallback: string, lang: string): string {
+  try {
+    return new Intl.DisplayNames([lang], { type: "region" }).of(code) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** City label in the active language. The VALUE stays the English name —
+ *  that is what the letter prints and the DB stores. */
+export function cityDisplayName(
+  city: { en: string; cn: string; ar: string },
+  lang: string,
+): string {
+  return lang === "zh" ? city.cn : lang === "ar" ? city.ar : city.en;
+}
+
+/* English country names → ISO code, for the form: the operator types (or
+   autofill supplies) "Egypt" and the code that drives the Chinese wording
+   fills itself — nobody should have to know what an ISO code is. Keys are
+   lowercase; the aliases cover the spellings that appear in the contacts
+   directory. Mirrors the countries COUNTRY_CN knows. */
+const NAME_TO_CODE: Record<string, string> = {
+  egypt: "EG", india: "IN", bangladesh: "BD", pakistan: "PK", "sri lanka": "LK",
+  turkey: "TR", "turkiye": "TR", indonesia: "ID", vietnam: "VN", "viet nam": "VN",
+  thailand: "TH", malaysia: "MY", philippines: "PH", myanmar: "MM", cambodia: "KH",
+  uzbekistan: "UZ", kazakhstan: "KZ", nigeria: "NG", morocco: "MA", algeria: "DZ",
+  tunisia: "TN", libya: "LY", sudan: "SD", ethiopia: "ET", kenya: "KE",
+  tanzania: "TZ", uganda: "UG", ghana: "GH", "south africa": "ZA", senegal: "SN",
+  "ivory coast": "CI", "cote d'ivoire": "CI", "saudi arabia": "SA", ksa: "SA",
+  uae: "AE", "united arab emirates": "AE", jordan: "JO", syria: "SY", iraq: "IQ",
+  lebanon: "LB", yemen: "YE", oman: "OM", kuwait: "KW", qatar: "QA",
+  bahrain: "BH", iran: "IR", russia: "RU", ukraine: "UA", belarus: "BY",
+  poland: "PL", romania: "RO", brazil: "BR", mexico: "MX", peru: "PE",
+  colombia: "CO", argentina: "AR", chile: "CL", ecuador: "EC", usa: "US",
+  "united states": "US", uk: "GB", "united kingdom": "GB", germany: "DE",
+  france: "FR", italy: "IT", spain: "ES", netherlands: "NL", portugal: "PT",
+  china: "CN", egyptian: "EG", indian: "IN", turkish: "TR",
+};
+
+/** Country name (or nationality adjective) → ISO code; null when unknown. */
+export function codeForCountryName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return NAME_TO_CODE[name.trim().toLowerCase()] ?? null;
 }
 
 /** True when the Chinese page would print an untranslated country name.

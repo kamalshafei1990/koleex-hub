@@ -18,7 +18,7 @@ import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_CS } from "@/lib/translations/contacts/cs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage } from "@/lib/storage-client";
 import {
@@ -143,7 +143,7 @@ export default function ContactsSection({
   onSaved: () => void | Promise<void>;
 }) {
   // editingId: contact id being edited, "new" for add, null for none
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_CS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
@@ -574,7 +574,7 @@ export default function ContactsSection({
       {/* ── QR upload modal ── */}
       {qrOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !qrBusy && setQrOpen(false)}>
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <ScanLineIcon className="h-4 w-4 text-[var(--text-secondary)]" />
               <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("cs.addCommunicationQr", "Add communication QR")}</span>

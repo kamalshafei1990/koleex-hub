@@ -57,6 +57,19 @@ type RowWithMetadata = Record<string, unknown> & { metadata?: unknown };
 export function serializeDiscussMessageForClient<T extends RowWithMetadata>(
   row: T,
 ): Omit<T, "metadata"> & { metadata: DiscussMetadataPublic } {
+  /* A soft-deleted message ships as a TOMBSTONE: the row (id, author,
+     timestamps, deleted_at) stays so the thread can render "This message was
+     deleted" in place, but its content never leaves the server — no body, no
+     rendered HTML, no mentions/products, no media. Hiding it in the UI while
+     still sending it was a leak to anyone with devtools. */
+  if (row.deleted_at) {
+    return {
+      ...row,
+      body: null,
+      ...("body_html" in row ? { body_html: null } : {}),
+      metadata: { media: [] },
+    };
+  }
   const rawMeta = row.metadata;
   const meta: Record<string, unknown> =
     rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)
@@ -74,6 +87,77 @@ export function serializeDiscussMessageForClient<T extends RowWithMetadata>(
   delete meta.voice;
 
   return { ...row, metadata: { ...meta, media } };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARED JOIN HELPERS — one copy for read / state / stream / mutate.
+   (These used to be pasted into every route and had already drifted: the
+   state route's copy dropped `name_alt`.)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+type PersonJoin =
+  | { full_name: string | null; name_alt?: string | null }
+  | Array<{ full_name: string | null; name_alt?: string | null }>
+  | null;
+
+export type DiscussAuthorJoin =
+  | { id: string; username: string; avatar_url: string | null; person: PersonJoin }
+  | Array<{ id: string; username: string; avatar_url: string | null; person: PersonJoin }>
+  | null;
+
+/** The author join every message read selects. Keep this the only copy. */
+export const DISCUSS_AUTHOR_SELECT = `
+  *,
+  author:accounts!discuss_messages_author_account_id_fkey (
+    id, username, avatar_url, person:people ( full_name, name_alt )
+  )
+`;
+
+/** Normalise the accounts→people join into the flat DiscussAuthor shape. */
+export function flattenDiscussAuthor(raw: DiscussAuthorJoin) {
+  const acc = Array.isArray(raw) ? raw[0] ?? null : raw;
+  if (!acc) return null;
+  const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
+  return {
+    id: acc.id,
+    username: acc.username,
+    avatar_url: acc.avatar_url,
+    full_name: person?.full_name ?? null,
+    name_alt: person?.name_alt ?? null,
+  };
+}
+
+export type DiscussReactionSummary = {
+  emoji: string;
+  count: number;
+  account_ids: string[];
+  reacted_by_me: boolean;
+};
+
+/** Aggregate reaction rows into the per-message summary the UI renders. */
+export function buildDiscussReactionMap(
+  rxRows: Array<{ message_id: string; emoji: string; account_id: string }>,
+  me: string,
+): Map<string, DiscussReactionSummary[]> {
+  const map = new Map<string, DiscussReactionSummary[]>();
+  for (const rx of rxRows) {
+    const bucket = map.get(rx.message_id) ?? [];
+    const existing = bucket.find((b) => b.emoji === rx.emoji);
+    if (existing) {
+      existing.count += 1;
+      existing.account_ids.push(rx.account_id);
+      if (rx.account_id === me) existing.reacted_by_me = true;
+    } else {
+      bucket.push({
+        emoji: rx.emoji,
+        count: 1,
+        account_ids: [rx.account_id],
+        reacted_by_me: rx.account_id === me,
+      });
+    }
+    map.set(rx.message_id, bucket);
+  }
+  return map;
 }
 
 /** Serialize a list of rows. Order is preserved exactly. */

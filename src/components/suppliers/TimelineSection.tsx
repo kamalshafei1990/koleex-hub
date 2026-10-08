@@ -17,7 +17,7 @@
 import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_TS } from "@/lib/translations/contacts/ts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   TIMELINE_CATEGORY_LABELS, TIMELINE_CATEGORY_ORDER, timelineCategoryLabel,
@@ -154,7 +154,7 @@ export default function TimelineSection({
   timeline: Row[];
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_TS);
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -361,7 +361,7 @@ export default function TimelineSection({
       {/* composer modal */}
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !busy && setOpen(false)}>
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(ev) => ev.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(ev) => ev.stopPropagation()}>
             <div className="flex items-center gap-2">
               <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
               <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("ts.logOperationalEvent", "Log operational event")}</span>

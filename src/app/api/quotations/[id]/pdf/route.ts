@@ -31,6 +31,15 @@ export const runtime = "nodejs";
    ceiling — bump to that. */
 export const maxDuration = 60;
 
+/* Time budget INSIDE maxDuration. The three waits below used to add up to
+   80 s on their own (goto 60 + ready 20), so a slow navigation was cut off
+   by the platform with no response at all instead of by us with a message.
+   Launch is not budgeted here: warm it is ~1 s, cold (binary download) a
+   few seconds, and the sum below leaves that room under 60. */
+const GOTO_TIMEOUT_MS = 35_000;
+const READY_TIMEOUT_MS = 12_000;
+const PDF_TIMEOUT_MS = 8_000;
+
 type RouteCtx = { params: Promise<{ id: string }> };
 
 /* Pinned Chromium pack hosted by @sparticuz. The URL has to match the
@@ -201,22 +210,34 @@ export async function GET(req: Request, { params }: RouteCtx) {
        networkidle-style behaviour: we don't care if Supabase or the
        sidebar finishes warming up, only that the doc + its images
        resolve, and the print page's `__quotation_pdf_ready__` flag
-       already covers that.
-
-       Bumped timeout to 60 s only for the cold-start case where
-       Chromium downloads the binary mid-navigation; warm calls
-       complete in well under 5 s. */
-    await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+       already covers that. Warm calls complete in well under 5 s. */
+    await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS });
     await page
       .waitForFunction(
         () =>
           (window as unknown as { __quotation_pdf_ready__?: boolean })
             .__quotation_pdf_ready__ === true,
-        { timeout: 20_000, polling: 100 },
+        { timeout: READY_TIMEOUT_MS, polling: 100 },
       )
       .catch(() => {
-        /* Fall through — render whatever's on screen rather than fail. */
+        /* Fall through to the DOM check below — a late image must not
+           fail the export, but a page that never rendered the doc must. */
       });
+
+    /* The print page shows "Loading quotation…" (or its error line) until
+       the fetch resolves. Snapshotting that produced a one-page PDF of the
+       words "Loading…", delivered as a success. A document is on screen
+       only when the A4 sheet exists. */
+    const hasDoc = await page
+      .evaluate(() => !!document.querySelector(".quot-a4-doc"))
+      .catch(() => false);
+    if (!hasDoc) {
+      console.error("[api/quotations/[id]/pdf] print page never rendered the document", { id });
+      return NextResponse.json(
+        { error: "The quotation did not finish rendering. Please try again." },
+        { status: 502 },
+      );
+    }
 
     /* preferCSSPageSize:false — we set the A4 / margin:0 layout via
        the @page rule in /quotations/[id]/print/page.tsx AND via the
@@ -228,6 +249,7 @@ export async function GET(req: Request, { params }: RouteCtx) {
       printBackground: true,
       preferCSSPageSize: false,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
+      timeout: PDF_TIMEOUT_MS,
     });
 
     /* Sniff the saved quote_no for the filename so the download is
@@ -240,18 +262,30 @@ export async function GET(req: Request, { params }: RouteCtx) {
       .catch(() => null);
 
     const filename = `${quoteNo ?? `quotation-${id}`}.pdf`;
+    /* Two filename forms (RFC 6266): a plain ASCII fallback with anything
+       that could close the quoted string stripped, and the RFC 5987 form
+       carrying the real name percent-encoded — so a quote number with a
+       quote mark, a semicolon or non-Latin letters can neither break the
+       header nor arrive garbled. */
+    const asciiName = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\;]/g, "_");
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition":
+          `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         "Cache-Control": "private, no-store",
       },
     });
   } catch (e) {
+    /* Full detail to the log only. Puppeteer/Chromium messages carry the
+       print URL, the executable path and timeouts — useful to us, not
+       something to hand to the browser. */
     console.error("[api/quotations/[id]/pdf]", e);
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "PDF export failed. Please try again or use Export PDF from the editor." },
+      { status: 500 },
+    );
   } finally {
     if (browser) await browser.close().catch(() => undefined);
   }

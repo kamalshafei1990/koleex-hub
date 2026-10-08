@@ -3,12 +3,20 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildVisualSnapshot, type Granularity } from "@/lib/finance/visual-statements";
+import { requireBankAndProfit } from "@/lib/experience";
+
+/* The income statement, balance sheet and cash flow ARE profit and cash:
+   Finance, then «Bank & Profit» (src/lib/experience). The Finance home shows
+   a line instead of the panel to anyone without it.
+   Guarded by validate:finance-perf §G. */
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
+  const denied = await requireBankAndProfit(auth, "The financial statements");
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const granularity = (url.searchParams.get("granularity") ?? "year") as Granularity;

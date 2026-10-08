@@ -1,8 +1,9 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { settleDealFollowups } from "@/lib/server/commerce-notify";
 
 /* GET    /api/crm/opportunities/[id]  — full single row (incl. description)
    PATCH  /api/crm/opportunities/[id]  — partial update
@@ -146,5 +147,6 @@ export async function DELETE(
     console.error("[api/crm/opportunities/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  after(() => settleDealFollowups(id));
   return NextResponse.json({ ok: true });
 }

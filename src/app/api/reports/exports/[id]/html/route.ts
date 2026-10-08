@@ -48,7 +48,7 @@ export async function GET(req: Request, ctx: RouteCtx) {
     channel: "print",
     skipAudit: true,
   });
-  if (!built.ok) return NextResponse.json({ error: built.error }, { status: built.status });
+  if (!built.ok) return NextResponse.json({ error: built.error, code: built.code }, { status: built.status });
 
   const autoPrint = (new URL(req.url).searchParams.get("auto") ?? "0") === "1";
   const html = renderReportHtml(built.result.payload, { autoPrint });

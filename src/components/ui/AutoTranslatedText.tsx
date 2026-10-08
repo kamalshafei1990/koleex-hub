@@ -31,9 +31,12 @@ interface Props {
       dropdown rows, chips): the chip is itself a button and nested buttons
       are invalid HTML (hydration error) — and it visually clutters tight UI. */
   plain?: boolean;
+  /** "auto" for user-written text: the direction follows the text itself, so
+      an English sentence in the Arabic UI keeps its full stop at the end. */
+  dir?: "auto" | "ltr" | "rtl";
 }
 
-export default function AutoTranslatedText({ text, className, block, plain }: Props) {
+export default function AutoTranslatedText({ text, className, block, plain, dir }: Props) {
   const { t } = useTranslation(commonT);
   const { display, wasTranslated, original, loading } = useAutoTranslate(text);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -45,7 +48,7 @@ export default function AutoTranslatedText({ text, className, block, plain }: Pr
 
   if (plain) {
     return (
-      <Wrapper className={className} title={wasTranslated ? original ?? undefined : undefined}
+      <Wrapper dir={dir} className={className} title={wasTranslated ? original ?? undefined : undefined}
         style={block ? { whiteSpace: "pre-wrap" } : undefined}>
         {display}
       </Wrapper>
@@ -53,7 +56,7 @@ export default function AutoTranslatedText({ text, className, block, plain }: Pr
   }
 
   return (
-    <Wrapper className={className} style={block ? { whiteSpace: "pre-wrap" } : undefined}>
+    <Wrapper dir={dir} className={className} style={block ? { whiteSpace: "pre-wrap" } : undefined}>
       {shown}
       {loading && (
         <span className="ms-1 align-middle text-[10px] text-[var(--text-ghost)]">…</span>

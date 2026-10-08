@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_NEG } from "@/lib/translations/contacts/neg";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { NEGOTIATION_INTEL_FIELDS, QUALITY_LEVELS, QUALITY_LEVEL_LABELS } from "@/lib/suppliers/intelligence";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
@@ -59,7 +59,7 @@ export default function NegotiationSection({
   negotiationIntel: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_NEG);
   const [open, setOpen] = useState(false);
   const [d, setD] = useState(emptyDraft);
   const [busy, setBusy] = useState(false);
@@ -165,7 +165,7 @@ export default function NegotiationSection({
       {/* scorecard edit modal */}
       {niEdit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !niBusy && setNiEdit(false)}>
-          <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><GaugeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("neg.scorecard", "Negotiation scorecard")}</span></div>
             <div className="grid grid-cols-2 gap-3">
               {NEGOTIATION_INTEL_FIELDS.map((f) => (
@@ -229,7 +229,7 @@ export default function NegotiationSection({
       {/* composer */}
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !busy && setOpen(false)}>
-          <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("neg.logModalTitle", "Log negotiation round")}</span></div>
             <div className="grid grid-cols-3 gap-3">
               <Field label={t("neg.fieldRoundNo", "Round #")}><input type="number" min={1} className={inputCls} value={d.round_no ?? ""} onChange={(e) => set("round_no" as keyof ReturnType<typeof emptyDraft>, e.target.value)} /></Field>

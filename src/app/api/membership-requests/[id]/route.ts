@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { isReviewer } from "@/lib/server/admin-recipients";
+import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 
 const DECISIONS = new Set(["pending", "approved", "rejected"]);
 const MAX_NOTE = 1000;
@@ -80,6 +81,11 @@ export async function PATCH(
   if (error) {
     console.error("[api/membership-requests PATCH]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  /* Decided: the request stops waiting in every other reviewer's bell. */
+  if (status !== "pending") {
+    await clearUnreadByMeta({ type: "membership_request", membership_request_id: id });
   }
 
   return NextResponse.json({ ok: true, status });

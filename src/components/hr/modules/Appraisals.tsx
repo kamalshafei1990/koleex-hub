@@ -59,7 +59,7 @@ const GOAL_STATUS_MAP: Record<string, string> = {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) {
+export default function AppraisalsModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [cycles, setCycles] = useState<AppraisalCycleRow[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string>("");
@@ -338,7 +338,7 @@ export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) 
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

@@ -15,6 +15,19 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p === "/products" ||
     p.startsWith("/products/") ||
     p.startsWith("/product-data") ||
+    /* Shipping, 2026-09-15. Sticky audit: ZERO stickies, and that is the
+       point of the entry.
+
+       It shipped with one — a kx-bar-host + kx-glass-bar search strip pinned
+       at var(--kx-header-h) — and the owner reported the result immediately:
+       half the page moved and half did not, and the strip's frost was a
+       SECOND edge blur under a header pane that already wears the ramp. Both
+       are gone. The app renders PageHeader with showTabs={false} and navigates
+       from the page itself, exactly like Travel, Expenses, Notes, Projects and
+       Planning — which is also why /shipping belongs here and NOT in
+       appOwnsTopRamp: with no tab band there is no ramp host, and listing it
+       there would trade the pane's frost for a ramp that never gets drawn. */
+    p.startsWith("/shipping") ||
     /* Inventory, 2026-08-12. THIS is what makes the main header glass on an
        app screen — the pane only frosts on under-glass routes, so converting
        an app's own surfaces and stopping there leaves a solid black bar at
@@ -119,6 +132,32 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p.startsWith("/notes") ||
     p.startsWith("/projects") ||
     p.startsWith("/planning") ||
+    /* The 2026-08-21 Aurora sweep — seven segments converted together via
+       AuroraShell layouts. Sticky audit per the rule at the top of this
+       file: each of these greps ZERO `sticky top-*` bars of its own across
+       its app folder AND its component folder (accounts→admin/accounts,
+       database→components/database, markets/website/translator→their single
+       components, roles + software-center are single-page). Their only
+       sticky is nothing — the clean Purchase case.
+       NOT here on purpose, pending a MEASURED pass (they own sticky bars):
+       /issues (qa's sticky top-0 filter bars), /knowledge (sticky TOC +
+       sticky table columns), /management, /price-calculator. */
+    p.startsWith("/accounts") ||
+    p.startsWith("/database") ||
+    p.startsWith("/markets") ||
+    p.startsWith("/roles") ||
+    p.startsWith("/software-center") ||
+    p.startsWith("/translator") ||
+    p.startsWith("/website") ||
+    /* Dashboard, 2026-08-20 (dark-launched — the route 404s in production
+       until the flag flips, so this entry is inert there).
+
+       Sticky audit, by the rule at the top of this file: the page renders a
+       plain title block and widget grids — ZERO stickies of its own, no
+       PageHeader band, so like Settings/Expenses it belongs here and NOT in
+       appOwnsTopRamp (no band means no ramp host). It is a flowing page in
+       the Hub scroller, so content genuinely passes under the pane. */
+    p.startsWith("/dashboard") ||
     /* Finance, 2026-08-16 — 29 routes, one entry.
 
        CORRECTED the same day. This comment first said "ZERO stickies across

@@ -1,0 +1,87 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   components/ai/WelcomeCard — the empty-conversation landing.
+
+   Phase 2J, sliced verbatim from KoleexAiApp.tsx. Takes its strings as a prop
+   rather than importing COPY, so it renders identically for any caller and
+   does not need to know how the host app resolves language.
+   --------------------------------------------------------------------------- */
+
+import { textLang } from "@/lib/text-direction";
+import { useEffect, useState } from "react";
+import KoleexOrb from "@/components/ai/KoleexGlowOrb";
+import { COPY } from "@/components/ai/copy";
+
+/* ── Welcome landing ── */
+
+export default function WelcomeCard({
+  copy,
+  onPick,
+  firstName,
+  showPrompts = true,
+}: {
+  copy: typeof COPY["en"];
+  onPick: (prompt: string) => void;
+  firstName: string;
+  /** Settings → Koleex AI → Suggested prompts. Off hides the tiles; the
+   *  greeting stays. */
+  showPrompts?: boolean;
+}) {
+  /* Hub-native welcome — same layout vocabulary as FinanceHome.
+     Small icon mark in a Hub-themed tile, a tight h2 + caption pair,
+     then suggestion tiles in a 2-column grid (matching the
+     "What do you want to do?" pattern on /finance). No drop-shadow
+     halos, no glass blur, no centered-pill chips. */
+  const greeting = firstName ? copy.welcomeTitleNamed.replace("{name}", firstName) : copy.welcomeTitle;
+  /* One-shot "jump" greet shortly after the welcome screen mounts, so the
+     orb waves hello when you open Koleex AI. greetKey starts at 0 (no fire
+     on mount) then flips to 1 → fires the jump reaction once. */
+  const [greet, setGreet] = useState(0);
+  useEffect(() => {
+    /* AFTER THE SCREEN HAS SETTLED (owner, 2026-09-13): at 350 ms the hop
+       landed while the root was still fading in and the composer's lazy
+       controls were still arriving, and read as part of a glitch rather
+       than a hello. 900 ms is past all of that. */
+    const t = setTimeout(() => setGreet(1), 900);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-4 md:py-8">
+      {/* BIGGER (owner, 2026-09-23: "make the new orb … more bigger", size
+          left to us): 144px from md up, like the Home greeting; 128px on a
+          phone, so the suggestions stay in view. One canvas drawn at 144 and
+          scaled in its box below md — no size swap after load. */}
+      <div className="relative shrink-0 w-[128px] h-[128px] md:w-[144px] md:h-[144px] mb-4 md:mb-6">
+        <div className="absolute top-0 start-0 max-md:scale-[0.8889] origin-top-left rtl:origin-top-right">
+          <KoleexOrb state="idle" greetKey={greet} size={144} />
+        </div>
+      </div>
+      <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
+        {greeting}
+      </h2>
+      <p className="text-[13px] text-[var(--text-dim)] mb-5 md:mb-9 max-w-md">
+        {copy.welcomeSub}
+      </p>
+
+      {showPrompts && (
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+        {copy.prompts.map((p, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(p)}
+            /* Aurora: suggestion chips are mini app-tiles over the ground —
+               tile glass (owner: "this also can have the glass effect").
+               Solid var() bg stays for Core; hover keeps speaking in the
+               border (the glass fill owns the background under Aurora). */
+            className="kx-glass relative group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+          >
+            <span className="kx-ai-tile-text flex-1 leading-snug" lang={textLang(p)}>{p}</span>
+          </button>
+        ))}
+      </div>
+      )}
+    </div>
+  );
+}

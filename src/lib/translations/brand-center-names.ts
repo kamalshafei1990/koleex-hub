@@ -1,0 +1,42 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Brand Center — the names of the library's 21 sections and the 14 parts of
+   the guidelines (lib/brand-center/overview holds their numbers). */
+export const brandCenterNamesT: Translations = {
+  "sec.stationery":  { en: "Stationery & office",                 zh: "办公文具",           ar: "الأدوات المكتبية" },
+  "sec.gifts":       { en: "Gifts & merchandise",                 zh: "礼品与周边",         ar: "الهدايا والدعاية" },
+  "sec.packaging":   { en: "Packaging & bags",                    zh: "包装与手提袋",       ar: "التغليف والشنط" },
+  "sec.uniforms":    { en: "Uniforms, apparel & safety",          zh: "制服、服装与安全",   ar: "اليونيفورم والملابس والسلامة" },
+  "sec.machine":     { en: "The machine itself",                  zh: "机器本身",           ar: "الماكينة نفسها" },
+  "sec.shipping":    { en: "Product packaging, shipping & parts", zh: "产品包装、运输与配件", ar: "تغليف المنتج والشحن وقطع الغيار" },
+  "sec.paperwork":   { en: "Machine paperwork",                   zh: "机器随附文件",       ar: "ورق الماكينة" },
+  "sec.print":       { en: "Marketing print",                     zh: "营销印刷品",         ar: "المطبوعات التسويقية" },
+  "sec.digital":     { en: "Digital & social",                    zh: "数字与社交媒体",     ar: "الديجيتال والسوشيال" },
+  "sec.video":       { en: "Video",                               zh: "视频",               ar: "الفيديو" },
+  "sec.documents":   { en: "Presentations & documents",           zh: "演示与文件",         ar: "العروض والمستندات" },
+  "sec.offices":     { en: "Offices & reception",                 zh: "办公室与前台",       ar: "المكاتب والاستقبال" },
+  "sec.factory":     { en: "Factory & warehouse",                 zh: "工厂与仓库",         ar: "المصنع والمخزن" },
+  "sec.showroom":    { en: "Showroom",                            zh: "展厅",               ar: "صالة العرض" },
+  "sec.signage":     { en: "Signage & wayfinding",                zh: "标识与导视",         ar: "اللافتات والإرشاد" },
+  "sec.exhibitions": { en: "Exhibitions & booths",                zh: "展会与展位",         ar: "المعارض والبوثات" },
+  "sec.events":      { en: "Events, conferences & parties",       zh: "活动、会议与派对",   ar: "الإيفنتات والمؤتمرات والحفلات" },
+  "sec.vehicles":    { en: "Vehicles",                            zh: "车辆",               ar: "العربيات" },
+  "sec.dealers":     { en: "Dealers & distributors",              zh: "经销商与分销商",     ar: "الوكلاء والموزعين" },
+  "sec.occasions":   { en: "Occasions & seasons",                 zh: "节日与季节",         ar: "المناسبات والمواسم" },
+  "sec.employees":   { en: "Employees",                           zh: "员工",               ar: "الموظفين" },
+
+  "part.p01": { en: "Brand foundation",   zh: "品牌基础",   ar: "أساس البراند" },
+  "part.p02": { en: "Brand architecture", zh: "品牌架构",   ar: "هيكل البراند" },
+  "part.p03": { en: "Logo",               zh: "标志",       ar: "اللوجو" },
+  "part.p04": { en: "Colour",             zh: "色彩",       ar: "الألوان" },
+  "part.p05": { en: "Typography",         zh: "字体",       ar: "الخطوط" },
+  "part.p06": { en: "Graphic elements",   zh: "图形元素",   ar: "العناصر الجرافيكية" },
+  "part.p07": { en: "Grids & layout",     zh: "网格与版式", ar: "الشبكات والتخطيط" },
+  "part.p08": { en: "Photography",        zh: "摄影",       ar: "التصوير" },
+  "part.p09": { en: "Video & motion",     zh: "视频与动态", ar: "الفيديو والحركة" },
+  "part.p10": { en: "Voice & writing",    zh: "语气与写作", ar: "الكلام والكتابة" },
+  "part.p11": { en: "Digital",            zh: "数字",       ar: "الديجيتال" },
+  "part.p12": { en: "Places",             zh: "场所",       ar: "الأماكن" },
+  "part.p13": { en: "Markets",            zh: "市场",       ar: "الأسواق" },
+  "part.p14": { en: "Governance",         zh: "品牌管理",   ar: "الإدارة" },
+};

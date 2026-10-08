@@ -8,14 +8,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, linkBtnCls, sectionTitleCls } from "../shared";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-type Stage = { id: string; name: string; sort_order: number };
+type Stage = { id: string; name: string };
 type Opp = { id: string; name: string; value: number | null; stage_id: string | null; expected_close_date: string | null; is_won: boolean | null; is_lost: boolean | null };
 
 export default function PipelineModule({ t }: SalesModuleProps) {
@@ -26,13 +25,11 @@ export default function PipelineModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [s, o] = await Promise.all([
-        supabase.from("crm_stages").select("id,name,sort_order").order("sort_order", { ascending: true }),
-        supabase.from("crm_opportunities").select("id,name,value,stage_id,expected_close_date,is_won,is_lost").eq("is_lost", false),
-      ]);
-      if (cancelled) return;
-      setStages((s.data ?? []) as Stage[]);
-      setOpps((o.data ?? []) as Opp[]);
+      const res = await fetch("/api/sales/overview?module=pipeline", { credentials: "include" });
+      const json = res.ok ? await res.json() : null;
+      if (cancelled || !json) return;
+      setStages((json.stages ?? []) as Stage[]);
+      setOpps((json.opps ?? []) as Opp[]);
       setLoading(false);
     })();
     return () => { cancelled = true; };

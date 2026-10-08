@@ -21,6 +21,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, issueLink } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
+import type { NotifTpl } from "@/lib/notification-templates";
 import { sanitizeAttachments } from "@/lib/qa/attachments";
 
 interface IssueRow {
@@ -128,20 +129,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Notify the assignee + admin watchers — never the actor.
   const actor = auth.username ?? "Reporter";
-  const title = action === "verify"
-    ? "Reporter verified the fix"
-    : "Reporter reopened the issue";
-  const messageBody = action === "verify"
-    ? `${actor} confirmed the fix worked on "${issue.title}".`
-    : `${actor} reopened "${issue.title}". Reason: ${reason}`;
+  // Translated per reader (translations/notif-templates/qa.ts).
+  const tpl: NotifTpl = action === "verify"
+    ? { k: "qa_issue_verified.by_reporter", p: { actor, title: issue.title } }
+    : { k: "qa_issue_reopened.by_reporter", p: { actor, title: issue.title, reason } };
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
     [
       {
         recipientId: issue.assigned_to,
         type: action === "verify" ? "qa_issue_verified" as const : "qa_issue_reopened" as const,
-        title,
-        body: messageBody,
+        tpl,
         link: issueLink(id),
         alert: action === "reopen",
       },
@@ -151,8 +149,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         actorId: auth.account_id,
         internal: false,
         type: action === "verify" ? "qa_issue_verified" : "qa_issue_reopened",
-        title,
-        body: messageBody,
+        tpl,
       }),
     ],
   );

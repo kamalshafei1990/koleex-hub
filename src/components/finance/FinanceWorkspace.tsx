@@ -11,7 +11,8 @@
      · Navigation cards (Expenses / Journals / Reports / FX)
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel, ErpQuickAction,
@@ -22,7 +23,12 @@ import { FocusBoundary, FocusToggle } from "@/components/ui/focus/FocusMode";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_HEADER } from "@/lib/translations/finance/header";
+import { FIN_WORKSPACE } from "@/lib/translations/finance/workspace";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_HEADER, ...FIN_WORKSPACE } as const;
+
 
 interface PendingItem {
   kind: "expense" | "payment" | "bill" | "journal";
@@ -70,27 +76,27 @@ const KIND_LABEL_KEY: Record<RecentItem["kind"], { key: string; en: string }> = 
   journal: { key: "kind.journal", en: "Journal" },
 };
 
-export default function FinanceWorkspace() {
-  const { t } = useTranslation(financeT);
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  const [vis, setVis]   = useState<{ can_see_bank_balances: boolean; can_see_profit: boolean } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+type WorkspaceSnap = {
+  snapshot: Snapshot | null;
+  visibility: { can_see_bank_balances: boolean; can_see_profit: boolean } | null;
+};
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const r = await fetch("/api/finance/workspace");
-        const j = await r.json();
-        if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
-        setSnap(j.snapshot);
-        setVis(j.visibility);
-      } catch (e) {
-        setError(humanizeError(e));
-      } finally { setLoading(false); }
-    })();
+export default function FinanceWorkspace() {
+  const { t } = useTranslation(DICT);
+
+  /* Warm: the workspace snapshot takes no filter, so the response IS the
+     default view. This is the finance landing screen — the one most worth
+     having on the glass before the network answers. */
+  const load = useCallback(async () => {
+    const r = await fetch("/api/finance/workspace");
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
+    return { snapshot: j.snapshot, visibility: j.visibility } as WorkspaceSnap;
   }, []);
+  const { data, loading, error: loadError } = useWarmData<WorkspaceSnap>("fin:workspace", load);
+  const snap = data?.snapshot ?? null;
+  const vis = data?.visibility ?? null;
+  const error = loadError ? String(humanizeError(loadError instanceof Error ? loadError.message : String(loadError))) : null;
 
   const totalPending = (snap?.pending.length ?? 0);
 
@@ -102,13 +108,16 @@ export default function FinanceWorkspace() {
       backHref="/"
       action={
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => openSmartCreate()}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]"
-                  title={t("header.createTitle", "Create (c)")}>
-            <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
-          </button>
+          {/* Smart Create is desktop/tablet only (owner: not on phones). */}
+          <span className="hidden sm:contents">
+            <button type="button" onClick={() => openSmartCreate()}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]"
+                    title={t("header.createTitle", "Create (c)")}>
+              <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
+            </button>
+          </span>
           <FocusToggle />
-          <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
+          <Link href="/reports/operational" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
             <RrIcon name="newspaper" size={12} /> {t("workspace.reports", "Reports")}
           </Link>
         </div>
@@ -125,7 +134,7 @@ export default function FinanceWorkspace() {
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
               <ErpQuickAction href="/finance/data-entry" icon="pencil"             label={t("workspace.qa.dataEntry",  "Data Entry")}  hint={t("workspace.qa.dataEntryHint",  "Assets · balances · all manual entry")} />
-              <ErpQuickAction href="/finance/visual"     icon="balance-scale-left" label={t("workspace.qa.statements", "Statements")}  hint={t("workspace.qa.statementsHint", "Income · Balance · Cash flow")} />
+              <ErpQuickAction href="/finance/statements"     icon="balance-scale-left" label={t("workspace.qa.statements", "Statements")}  hint={t("workspace.qa.statementsHint", "Income · Balance · Cash flow")} />
               <ErpQuickAction href="/finance/fx-rates"   icon="balance-scale-left" label={t("workspace.qa.fx",         "FX Rates")}    hint={t("workspace.qa.fxHint",         "USD → CNY · stale + missing")} />
               <ErpQuickAction href="/finance/approvals"  icon="badge-check"        label={t("workspace.qa.approvals",  "Approvals")}   hint={t("workspace.qa.approvalsHint",  "Review pending")} />
             </div>
@@ -247,8 +256,8 @@ export default function FinanceWorkspace() {
           {/* Navigation cards */}
           <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <NavCard href="/finance/expenses"   icon="receipt"             label={t("workspace.nav.expenses",  "Expenses")}  count={snap.counts.expenses_open} />
-            <NavCard href="/finance/accounting" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
-            <NavCard href="/reports"            icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
+            <NavCard href="/finance/accounting/queue" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
+            <NavCard href="/reports/operational" icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
             <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label={t("workspace.nav.fxActivity", "FX Activity")} count={snap.counts.fx_30d} />
           </section>
           </FocusBoundary>
@@ -292,7 +301,7 @@ function EmptyState({ icon, title, body, actionHref, actionLabel }: {
 function NavCard({ href, icon, label, count }: {
   href: string; icon: RrIconName; label: string; count: number | null;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   return (
     <Link href={href} className="block">
       <ErpPanel className="kx-glass px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">

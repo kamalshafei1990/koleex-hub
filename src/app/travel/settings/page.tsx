@@ -49,6 +49,20 @@ export default function TravelSettingsPage() {
   /** Populated from the first 403 — the page then shows a read-only notice
    *  instead of letting a non-SA fill a form that cannot be saved. */
   const [readOnly, setReadOnly] = useState(false);
+  /** In-app licence viewer. a new-tab open was the first version — fine in a
+   *  browser tab, but in the desktop app (Electron) there ARE no tabs: the
+   *  window itself navigated to the raw image URL and the owner was stranded
+   *  with no way back. An overlay works identically everywhere. */
+  const [viewingLicence, setViewingLicence] = useState(false);
+
+  useEffect(() => {
+    if (!viewingLicence) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewingLicence(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewingLicence]);
 
   useEffect(() => {
     void (async () => {
@@ -129,8 +143,27 @@ export default function TravelSettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl px-4 pb-24 sm:px-6">
+    /* min-h-full, NOT h-full + overflow-y-auto.
+
+       Owning an internal scroller froze the Hub's own scroller
+       (#main-scroll-container) — the page scrolled inside itself while the
+       shell stayed still, which is why the frosted header ramp never passed
+       over the content and the action buttons sat under it permanently.
+       These are flowing form/list pages, so they belong IN the Hub scroller
+       exactly like Expenses. h-full is for a page that genuinely owns its
+       internal panes; this is not one. */
+    <div className="min-h-full">
+      {/* The Hub shell — width and top padding the same as every app (the
+          owner's fit-the-screen rule). This was pt-12, exactly the `+ 3rem`
+          of a frosted ramp that hung below the header and veiled the action
+          row at rest. That ramp is gone at rest now: the header is solid until
+          you scroll, and nothing paints in the 56–104 px strip (measured
+          25/09, desktop and phone) — so pt-12 had become a gap. If a ramp
+          ever hangs below the header at rest again, fix the ramp; do not pad
+          every app to dodge it.
+          It was max-w-4xl (896); at the Hub width the four cards sit two
+          across on xl instead of one long column. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-24">
         <PageHeader
           title={t("nav.settings")}
           subtitle={t("app.subtitle")}
@@ -155,7 +188,7 @@ export default function TravelSettingsPage() {
           </div>
         )}
 
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
           <Section title="Company">
             <TextField
               label="Registered name (English)"
@@ -226,15 +259,21 @@ export default function TravelSettingsPage() {
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {s.licenceDocUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element -- a
-                   single settings thumbnail; next/image's wrapper buys
-                   nothing here and its lazy behaviour hides the one thing
-                   the operator opened this screen to check. */
-                <img
-                  src={s.licenceDocUrl}
-                  alt="Business licence"
-                  className="h-40 w-auto rounded-xl border border-[var(--border-subtle)] bg-white object-contain"
-                />
+                <button
+                  type="button"
+                  onClick={() => setViewingLicence(true)}
+                  aria-label="View the business licence"
+                  data-kx-keep-hover=""
+                  className="rounded-xl transition-opacity hover:opacity-90"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a
+                      single settings thumbnail; next/image buys nothing here */}
+                  <img
+                    src={s.licenceDocUrl}
+                    alt="Business licence"
+                    className="h-40 w-auto rounded-xl border border-[var(--border-subtle)] bg-white object-contain"
+                  />
+                </button>
               ) : (
                 <div className="flex h-40 w-64 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-dim)]">
                   Not uploaded yet
@@ -254,7 +293,7 @@ export default function TravelSettingsPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => window.open(s.licenceDocUrl!, "_blank", "noopener")}
+                    onClick={() => setViewingLicence(true)}
                   >
                     {t("scan.view")}
                   </Button>
@@ -284,6 +323,37 @@ export default function TravelSettingsPage() {
           </section>
         </div>
       </div>
+
+      {viewingLicence && s.licenceDocUrl && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center px-4 py-6 bg-black/40 backdrop-blur-[2px]"
+          onClick={() => setViewingLicence(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Business licence"
+        >
+          <div
+            className="kx-glass-pop relative max-h-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- full-size
+                one-off document view; next/image buys nothing here */}
+            <img
+              src={s.licenceDocUrl}
+              alt="Business licence, full size"
+              className="max-h-[85vh] w-auto max-w-[90vw] bg-white object-contain"
+            />
+            <button
+              type="button"
+              onClick={() => setViewingLicence(false)}
+              aria-label="Close"
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 text-lg leading-none text-[var(--text-primary)] shadow hover:bg-[var(--bg-surface-hover)]"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

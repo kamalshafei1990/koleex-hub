@@ -147,7 +147,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
         )}
 
         {adding && (
-          <div className="mt-2 space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
+          <div className="mt-2 space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
             <Select label={t("vl.registry.division", "Division")} value={divId} onChange={setDivId} options={data.divisions} placeholder={t("vl.registry.selectDivision", "Select division…")} />
             {divId && <Select label={t("vl.registry.category", "Category")} value={catId} onChange={setCatId} options={cats} placeholder={t("vl.registry.optional", "(optional)")} />}
             {catId && <Select label={t("vl.registry.subcategory", "Subcategory")} value={subId} onChange={setSubId} options={subs} placeholder={t("vl.registry.optional", "(optional)")} />}
@@ -211,7 +211,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   );
 }
 function Tag({ children, tone }: { children: React.ReactNode; tone?: "rose" }) {
-  return <span className={`rounded-full border px-1.5 py-px text-[9.5px] font-medium ${tone === "rose" ? "border-rose-500/30 bg-rose-500/10 text-rose-300" : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-dim)]"}`}>{children}</span>;
+  return <span className={`rounded-full border px-1.5 py-px text-[9.5px] font-medium ${tone === "rose" ? "border-rose-500/30 bg-rose-500/10 text-rose-300" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-dim)]"}`}>{children}</span>;
 }
 function Select({ label, value, onChange, options, placeholder }: { label: string; value: string; onChange: (v: string) => void; options: Opt[]; placeholder: string }) {
   return (

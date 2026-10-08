@@ -13,8 +13,10 @@
    nothing behind it and the whole screen read as Core. Scope and ground are
    what make that glass mean something.
 
-   `h-full`: HRApp owns its own internal scrolling (flex column with
-   overflow-hidden), so it fills the box the shell gives it.
+   `min-h-full`: the app flows with the page now — #main-scroll-container
+   scrolls it like every other Hub app (owner, 2026-10-08: the nested
+   scroller never received the wheel in the in-app browser, "can't scroll
+   down"). The ground still covers the viewport behind it.
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";
@@ -25,7 +27,7 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 export default function HrLayout({ children }: { children: React.ReactNode }) {
   const aurora = useSkin() === "aurora";
   return (
-    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative h-full bg-[var(--bg-primary)] text-[var(--text-primary)]`}>
+    <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]`}>
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground topLight />

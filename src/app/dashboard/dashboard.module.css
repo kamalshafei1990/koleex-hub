@@ -1,0 +1,46 @@
+/* ---------------------------------------------------------------------------
+   Dashboard app — the FULL SUMMARY board (dark-launched; production 404s).
+   Card faces, canvas, and edit chrome live in the shared widget-kit module;
+   this file styles only the page frame and the per-app sections.
+
+   FIT THE SCREEN (owner): no narrow cap — the board uses the whole width.
+   --------------------------------------------------------------------------- */
+
+/* generous but composed: effectively full width on the owner's screens,
+   centered with breathing room on ultra-wide */
+.page { max-inline-size: 1760px; margin: 0 auto; padding: 26px 30px 90px; }
+
+.head { display: flex; align-items: center; gap: 14px; margin-block-end: 24px; flex-wrap: wrap; }
+.title { font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+.subtitle { font-size: 10.5px; letter-spacing: 1.3px; color: rgba(205, 220, 240, 0.45); margin-block-start: 2px; }
+.headBtns { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; }
+.hint { font-size: 11px; color: rgba(188, 216, 240, 0.55); }
+
+.loading { display: grid; place-items: center; padding-block: 90px; }
+
+/* ── sections ── */
+.section { margin-block-end: 34px; }
+.secHead { display: flex; align-items: center; gap: 12px; margin-block-end: 13px; }
+.secDot { inline-size: 6px; block-size: 6px; border-radius: 50%; flex: none;
+  background: #7fa9d6; box-shadow: 0 0 9px rgba(127, 169, 214, 0.7); }
+.secTitle { font-size: 11px; font-weight: 700; letter-spacing: 2.2px; text-transform: uppercase; color: rgba(226, 238, 250, 0.62); white-space: nowrap; }
+.secRule { flex: 1; block-size: 1px; background: linear-gradient(90deg, rgba(127, 169, 214, 0.28), rgba(127, 169, 214, 0.04) 60%, transparent); }
+.secCount { font-size: 9px; color: rgba(188, 216, 240, 0.45); border: 1px solid rgba(165, 200, 250, 0.15);
+  border-radius: 9999px; padding: 2px 8px; letter-spacing: 1px; }
+
+/* ── the Widgets view: app headers with the icon BIG and clear ── */
+.pinHint { font-size: 11px; color: rgba(188, 216, 240, 0.55); margin-block-end: 18px; }
+.appHead { display: flex; align-items: center; gap: 12px; margin-block-end: 13px; }
+.appIcon {
+  inline-size: 42px; block-size: 42px; border-radius: 12px; flex: none;
+  display: grid; place-items: center;
+  color: rgba(226, 238, 250, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04);
+  filter: drop-shadow(0 0 8px rgba(120, 180, 255, 0.18));
+}
+.appName { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; color: #eef4fb; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .page { padding-inline: 16px; }
+  .hint { display: none; }
+}

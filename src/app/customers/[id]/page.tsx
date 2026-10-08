@@ -11,7 +11,8 @@
    The page shows:
      · Header card with avatar, tier badge, status, key contacts.
      · Activity tab aggregating CRM opportunities, Quotations, Invoices,
-       Projects, and open Tasks linked to this contact_id.
+       Projects, and open Tasks linked to this contact_id — and, above
+       them, the messages the customer sent from the public website.
      · Commercial tab with sales rep, payment terms, credit limit, plus
        the matched row from the legacy commercial-policy `customers` table
        when one exists (findLinkedCommercialCustomer).
@@ -27,8 +28,10 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -57,6 +60,7 @@ import {
   type CustomerTier,
 } from "@/lib/customers-admin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -269,6 +273,56 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
+/** "27/09/2026 09:30" in the reader's own time — day first, the Hub's rule. */
+function formatDayTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+/* What the customer wrote from the public website (contact form or «Request
+   a quotation»), in their own words and in full — the notification is not
+   the only place it lives. Shown only when there is one. */
+function WebsiteMessagesCard({ bucket }: { bucket: CustomerActivity["messages"] }) {
+  const { t } = useTranslation(customerProfileT);
+  return (
+    <section className={`${panelCls} mb-4`}>
+      <div className="flex items-start gap-3 mb-3">
+        <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0" aria-hidden>
+          <GlobeIcon size={16} />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">{t("messages.title")}</h3>
+          <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
+            {`${bucket.count} ${t("activity.total")}`}{bucket.count > bucket.recent.length ? ` · ${t("messages.latest")}` : ""}
+          </p>
+        </div>
+      </div>
+      <ul className="divide-y divide-[var(--border-faint)]">
+        {bucket.recent.map((m) => (
+          <li key={m.id} className="py-3 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
+                {m.quote ? t("messages.quote") : t("messages.message")}
+              </span>
+              {m.product && m.product.id ? (
+                <Link href={`/products/${m.product.id}`} className="text-[12px] font-medium text-[var(--text-primary)] hover:underline underline-offset-2">
+                  {m.product.name ?? m.product.slug}
+                </Link>
+              ) : m.product ? (
+                <span className="text-[12px] text-[var(--text-secondary)]">{m.product.name ?? m.product.slug}</span>
+              ) : null}
+              <span className="ms-auto text-[11px] text-[var(--text-faint)] tabular-nums" dir="ltr">{formatDayTime(m.createdAt)}</span>
+            </div>
+            <p className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words" dir="auto">{m.message}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════ */
@@ -286,6 +340,7 @@ export default function CustomerProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("activity");
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [creatingCommercial, setCreatingCommercial] = useState(false);
   const [createError, setCreateError] = useState(false);
 
@@ -331,7 +386,8 @@ export default function CustomerProfilePage({
       + activity.quotations.count
       + activity.invoices.count
       + activity.projects.count
-      + activity.tasks.count;
+      + activity.tasks.count
+      + activity.messages.count;
   }, [activity]);
 
   if (notFound) {
@@ -366,12 +422,9 @@ export default function CustomerProfilePage({
         {/* ── Back ── */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/customers"
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label={t("notFound.back")}
-            >
-              <ArrowLeftIcon size={16} />
+            <Link href="/customers" className={BACK_CHROME} aria-label={t("notFound.back")}>
+              <ArrowLeftIcon size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{t("nav.customers")}</span>
             </Link>
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">{t("header.title")}</h1>
           </div>
@@ -497,6 +550,7 @@ export default function CustomerProfilePage({
           })}
         </nav>
 
+        <div key={tab} className={tabMotion}>
         {/* ── Activity ── */}
         {tab === "activity" && (
           <div>
@@ -513,6 +567,8 @@ export default function CustomerProfilePage({
                 </p>
               </div>
             ) : (
+              <>
+              {activity.messages.count > 0 && <WebsiteMessagesCard bucket={activity.messages} />}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 <ActivityCard
                   title={t("card.opportunities")}
@@ -550,7 +606,11 @@ export default function CustomerProfilePage({
                   emptyHint={t("card.empty.tasks")}
                 />
               </div>
+              </>
             )}
+            {/* The reports linked to this customer (Reports Phase 4A) — under
+                the grid or the empty state, so it shows either way. */}
+            <ReportsAboutCard type="customer" id={id} className={`${panelCls} mt-4`} />
           </div>
         )}
 
@@ -688,6 +748,7 @@ export default function CustomerProfilePage({
           </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

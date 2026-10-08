@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    /* A separate service with its own package.json and runtime (Node on
+       Railway), not part of the Next.js app: services/voice-relay. */
+    "services/**",
   ]),
   {
     /* VENDORED, NOT OURS. The shader wallpapers under this folder are React

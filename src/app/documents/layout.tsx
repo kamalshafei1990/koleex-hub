@@ -17,12 +17,21 @@
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useSkin } from "@/lib/appearance";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function DocumentsLayout({ children }: { children: React.ReactNode }) {
   const aurora = useSkin() === "aurora";
+  const pathname = usePathname() ?? "";
+
+  /* The print route renders BARE. Wrapping the page that exists to keep the
+     Hub layout out of the print pass would put back exactly what it escapes,
+     and a wrapper imposing its own height on the page box is what turns one
+     landscape sheet into 1.7 of them. */
+  if (pathname.endsWith("/print")) return <>{children}</>;
+
   return (
     <div className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]`}>
       {aurora && (

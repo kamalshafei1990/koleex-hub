@@ -28,6 +28,7 @@ interface Ask {
   title: ReactNode;
   run: () => void | Promise<void>;
   confirmLabel?: string;
+  cancelLabel?: string;
   tone?: "danger" | "neutral";
   onCancel?: () => void;
 }
@@ -36,7 +37,7 @@ export function useConfirm() {
   const [ask, setAsk] = useState<Ask | null>(null);
 
   const askConfirm = useCallback(
-    (title: ReactNode, run: () => void | Promise<void>, opts?: { confirmLabel?: string; tone?: "danger" | "neutral"; onCancel?: () => void }) => {
+    (title: ReactNode, run: () => void | Promise<void>, opts?: { confirmLabel?: string; cancelLabel?: string; tone?: "danger" | "neutral"; onCancel?: () => void }) => {
       setAsk({ title, run, ...opts });
     },
     [],
@@ -47,6 +48,7 @@ export function useConfirm() {
       open={ask !== null}
       title={ask?.title ?? ""}
       confirmLabel={ask?.confirmLabel ?? "Confirm"}
+      cancelLabel={ask?.cancelLabel ?? "Cancel"}
       tone={ask?.tone ?? "danger"}
       onCancel={() => { const c = ask?.onCancel; setAsk(null); c?.(); }}
       onConfirm={() => {

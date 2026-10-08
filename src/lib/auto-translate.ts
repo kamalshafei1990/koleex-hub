@@ -147,38 +147,30 @@ export function useAutoTranslate(text: string | null | undefined): {
   const sameLang = guessed === target;
 
   const cacheKey = `${target}|${original}`;
-  const [display, setDisplay] = useState<string>(() => {
-    if (!original || sameLang) return original;
-    return memCache.get(cacheKey) ?? original;
-  });
-  const [loading, setLoading] = useState<boolean>(false);
+  const skip = !original.trim() || sameLang;
+  /* The answer is KEYED to (language, text): a translation into the previous
+     language can never be shown for the next one — a Chinese reader used to
+     keep seeing the Arabic text after switching, for good if the request
+     failed. Loading is derived, not set, so the effect sets no state
+     synchronously. */
+  const [result, setResult] = useState<{ key: string; text: string | null } | null>(null);
+  const settled = result?.key === cacheKey ? result : null;
+  const cached = memCache.get(cacheKey);
+  const display = skip ? original : cached ?? settled?.text ?? original;
+  const loading = !skip && cached === undefined && !settled;
 
   useEffect(() => {
-    if (!original.trim() || sameLang) {
-      setDisplay(original);
-      return;
-    }
-    const cached = memCache.get(cacheKey);
-    if (cached) {
-      setDisplay(cached);
-      return;
-    }
+    if (skip || memCache.has(cacheKey)) return;
     let cancelled = false;
-    setLoading(true);
-    translateRemote(cacheKey, original, target, guessed)
-      .then((translated) => {
-        if (cancelled) return;
-        // Only swap in a genuine translation; on failure keep the original
-        // showing (and translateRemote left the cache clean so it retries).
-        if (translated) setDisplay(translated);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    translateRemote(cacheKey, original, target, guessed).then((translated) => {
+      /* null = failed: keep the original showing (translateRemote left the
+         cache clean, so a later render retries). */
+      if (!cancelled) setResult({ key: cacheKey, text: translated });
+    });
     return () => {
       cancelled = true;
     };
-  }, [original, target, sameLang, cacheKey, guessed]);
+  }, [original, target, skip, cacheKey, guessed]);
 
   return {
     display,

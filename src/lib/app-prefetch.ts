@@ -23,14 +23,19 @@
     business apps that are also light-to-medium to load). See
     APP_USAGE_AND_PRELOAD_RANKING.md. Keep this list SHORT — never idle-preload
     the whole catalogue. */
-export const TIER_A_IDLE_PRELOAD: readonly string[] = ["customers", "suppliers", "products", "quotations"];
+/* KOLEEX AI IS WARMED ON HOME (owner, 2026-09-13: "extremely fast, almost no
+   loading"). It was tier C as "the heavy AI workspace"; it is also the app
+   this owner opens most, and the loading screen they see is its chunk
+   downloading on the tap. The idle warm stays gated on Save-Data, a slow
+   link, a hidden tab and being offline (isPreloadAllowed). */
+export const TIER_A_IDLE_PRELOAD: readonly string[] = ["ai", "customers", "suppliers", "products", "quotations"];
 
 /** App ids explicitly excluded from ANY automatic preload (heavy / rare /
-    sensitive): the Visual Library database (5k assets), the AI workspace, the
-    activity monitor, the download center, finance dashboards, price calculator.
+    sensitive): the Visual Library database (5k assets), the activity monitor,
+    the download center, finance dashboards, price calculator.
     They still load instantly on an explicit click. */
 export const TIER_C_NO_PRELOAD: readonly string[] = [
-  "database", "ai", "activity-monitor", "software-center", "finance", "price-calculator",
+  "database", "activity-monitor", "software-center", "finance", "price-calculator",
 ];
 
 export function prefetchTier(appId: string): "A" | "B" | "C" {
@@ -47,6 +52,51 @@ export interface NetworkContext {
   online: boolean;
   /** navigator.deviceMemory (GB), if exposed. */
   deviceMemoryGb: number | null;
+  /** The link MEASURED slow on this page load (see measuredSlowLink). */
+  slowLink?: boolean;
+}
+
+/** Whether the HEAVY background warm — a whole app's client chunk, hundreds
+    of KB to MB (Contacts alone is ~1.3 MB on the wire) — is worth paying
+    now. Stricter than isPreloadAllowed: also off on a link measured slow,
+    where that download would still be running when the user taps another
+    app and would make that app wait (owner, 26/09, phone in China without a
+    VPN: "some apps take long time in opening"). The cheap route/RSC prefetch
+    and the intent warm on touch/hover (`force`) are unaffected. */
+export function isHeavyPreloadAllowed(ctx: NetworkContext): boolean {
+  return isPreloadAllowed(ctx) && !ctx.slowLink;
+}
+
+/* ── Measured link speed ──
+   navigator.connection is missing on iPhone (Safari) and on Chrome it only
+   buckets "4g" down to a 270 ms RTT — a phone in mainland China without a VPN
+   reports "4g" while each round-trip to the Hub takes 300-900 ms. So judge by
+   what this page load actually saw: the document's time to first byte, and
+   the throughput of the scripts it has already downloaded. Recomputed on each
+   call (a few entries, cheap), so a link that recovers is noticed. */
+const SLOW_TTFB_MS = 700;
+const SLOW_BYTES_PER_MS = 300; // ≈ 300 KB/s ≈ 2.4 Mbit/s
+export function measuredSlowLink(): boolean {
+  try {
+    if (typeof performance === "undefined" || !performance.getEntriesByType) return false;
+    const conn = (navigator as unknown as { connection?: { rtt?: number } }).connection;
+    if (typeof conn?.rtt === "number" && conn.rtt >= 400) return true;
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav && nav.responseStart > 0 && nav.responseStart - nav.requestStart > SLOW_TTFB_MS) return true;
+    let bytes = 0;
+    let ms = 0;
+    for (const e of performance.getEntriesByType("resource") as PerformanceResourceTiming[]) {
+      /* Real network downloads only: cached entries report transferSize 0. */
+      if (e.initiatorType !== "script" || e.transferSize < 20_000) continue;
+      const dl = e.responseEnd - e.responseStart;
+      if (dl <= 0) continue;
+      bytes += e.transferSize;
+      ms += dl;
+    }
+    return bytes >= 100_000 && bytes / ms < SLOW_BYTES_PER_MS;
+  } catch {
+    return false;
+  }
 }
 
 /** Whether idle/intent preloading is safe under the current conditions.
@@ -83,5 +133,6 @@ export function readNetworkContext(): NetworkContext {
     hidden: typeof document !== "undefined" && document.visibilityState === "hidden",
     online: navigator.onLine !== false,
     deviceMemoryGb: (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? null,
+    slowLink: measuredSlowLink(),
   };
 }

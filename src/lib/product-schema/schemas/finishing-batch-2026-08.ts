@@ -28,7 +28,6 @@ import type { ProductSchemaDefinition, SpecGroup } from "@/types/product-schema"
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -162,7 +161,6 @@ const FUSING_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40, { motorLabel: "Motor Power" }),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 
@@ -295,7 +293,6 @@ const IRONING_TABLE_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 
@@ -441,7 +438,6 @@ const TROUSER_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 
@@ -533,7 +529,6 @@ const STEAM_GENERATOR_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70, [
     { value: "safety_valve", label: "Safety Valve" },
     { value: "pressure_controller", label: "Pressure Controller" },
@@ -669,7 +664,6 @@ const FORM_FINISHING_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 
@@ -759,7 +753,6 @@ const NEEDLE_DETECTOR_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 
@@ -834,7 +827,6 @@ const REVERSING_GROUPS: SpecGroup[] = [
   },
   electricalGroup(40, { motorLabel: "Motor Power" }),
   physicalGroup(60),
-  packingShippingGroup(65),
   safetyComplianceGroup(70),
 ];
 

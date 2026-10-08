@@ -1,12 +1,15 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { ledgerDraft } from "@/lib/accounting/hooks";
+import { prepareTpl } from "@/lib/notification-templates";
 
-/* POST /api/invoices/:id/send — mark a draft invoice as sent and fire
-   an inbox notification to the customer's account (if they have one)
-   AND to the creator if they're not the sender. */
+/* POST /api/invoices/:id/send — mark a draft invoice as sent, draft its
+   revenue recognition in the ledger (Dr A/R / Cr Revenue / Cr Tax) and
+   fire an inbox notification to the customer's account (if they have one). */
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -31,6 +34,9 @@ export async function POST(_req: Request, { params }: RouteCtx) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Invoice not in a sendable state" }, { status: 400 });
 
+  // An issued invoice is revenue: draft the journal entry now (idempotent on resend).
+  await ledgerDraft("sales_revenue", data.id, auth.tenant_id, auth.account_id);
+
   // Optional: ping the customer's linked account if one exists.
   if (data.customer_id) {
     const { data: custAcct } = await supabaseServer
@@ -40,15 +46,26 @@ export async function POST(_req: Request, { params }: RouteCtx) {
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle();
     if (custAcct?.id) {
+      const text = prepareTpl({
+        k: "invoice_sent",
+        p: {
+          no: data.inv_no,
+          amount: `${data.currency} ${Number(data.total).toFixed(2)}`,
+          due: data.due_date ? dmyDate(data.due_date) : null,
+        },
+      });
       void supabaseServer.from("inbox_messages").insert({
         recipient_account_id: custAcct.id,
         sender_account_id: auth.account_id,
         tenant_id: auth.tenant_id,
         category: "system",
-        subject: `Invoice ${data.inv_no} issued`,
-        body: `An invoice for ${data.currency} ${Number(data.total).toFixed(2)} has been issued${data.due_date ? ` and is due ${data.due_date}` : ""}.`,
+        subject: text.subject,
+        body: text.body,
         link: "/invoices",
-        metadata: { source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no },
+        metadata: {
+          source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no,
+          ...(text.tpl ? { tpl: text.tpl } : {}),
+        },
       });
     }
   }

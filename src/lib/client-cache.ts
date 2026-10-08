@@ -1,5 +1,7 @@
 "use client";
 
+import { getCurrentAccountIdSync } from "./identity";
+
 /* ---------------------------------------------------------------------------
    Request coalescing for shared reference endpoints.
 
@@ -78,9 +80,74 @@ const SHELL_SECTION: Record<string, string> = {
    module-level promise becomes several independent ones and the "single"
    flight fires once per copy — measured 2 /api/shell calls instead of 1.
    Anchoring on globalThis makes every copy share one promise. */
-interface ShellState { inflight: Promise<Record<string, unknown> | null> | null }
+/* ⚠️ THE RESOLVED BODY IS KEPT, NOT JUST THE IN-FLIGHT PROMISE.
+   Coalescing only ever helped callers that asked DURING a request. Measured on
+   prod: /api/shell is 93 KB and 1.2-2.9s, it is fetched on EVERY navigation,
+   and it is the slowest thing on screens whose own data is a single ~1s call.
+   Holding the answer for a minute means moving between apps costs nothing for
+   the chrome — permissions, settings, FX, icon bindings and the badge counts
+   do not change between one screen and the next. A mutation still clears it
+   through invalidateCachedGet(), and 60s matches the badge poll, so a counter
+   is never more stale than it already was. */
+const BATCH_TTL_MS = 60_000;
+interface ShellState {
+  inflight: Promise<Record<string, unknown> | null> | null;
+  body?: Record<string, unknown> | null;
+  at?: number;
+}
 const sg = globalThis as typeof globalThis & { __kxShellBatch?: ShellState };
 const shellState: ShellState = sg.__kxShellBatch ?? (sg.__kxShellBatch = { inflight: null });
+
+/* ── Shell warm-start mirror ───────────────────────────────────────────
+   The 60 s batch cache only helps WITHIN a session: the FIRST shell of
+   every session still paid the full 1.2-2.9 s round trip, and the chrome
+   (permissions, FX, platform settings) waited on it. The mirror keeps the
+   last shell body in localStorage (24 h cap, keyed to the signed-in
+   account, auto-wiped on sign-out by the "kx:" prefix sweep in
+   session-caches.ts) so a returning session paints the chrome instantly
+   and the fresh shell replaces it behind the scenes — the same contract
+   the taxonomy mirror has lived with for months. Staleness is bounded by
+   the SAME 60 s TTL the in-memory cache already allowed, and the server
+   remains the permission perimeter (UI gates are hints). */
+const SHELL_MIRROR_KEY = "kx:shell-mirror";
+const SHELL_MIRROR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+interface ShellMirror {
+  accountId: string | null;
+  at: number;
+  body: Record<string, unknown>;
+}
+function readShellMirror(): Record<string, unknown> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SHELL_MIRROR_KEY);
+    if (!raw) return null;
+    const m = JSON.parse(raw) as ShellMirror;
+    if (!m || typeof m !== "object" || !m.body || typeof m.at !== "number") return null;
+    if (Date.now() - m.at > SHELL_MIRROR_MAX_AGE_MS) return null;
+    /* Never paint one account's chrome into another's session. */
+    const me = getCurrentAccountIdSync();
+    if (m.accountId && me && m.accountId !== me) return null;
+    return m.body;
+  } catch { return null; }
+}
+function writeShellMirror(body: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const mirror: ShellMirror = { accountId: getCurrentAccountIdSync(), at: Date.now(), body };
+    window.localStorage.setItem(SHELL_MIRROR_KEY, JSON.stringify(mirror));
+  } catch { /* quota / private mode — the session cache still works */ }
+}
+function dropShellMirror(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(SHELL_MIRROR_KEY); } catch { /* ignore */ }
+}
+/* Generation guard: a mutation invalidation that lands BETWEEN the mirror
+   read and the background refresh must not be overwritten by the older
+   network answer. invalidateCachedGet bumps this; the background writer
+   compares. */
+const gg = globalThis as typeof globalThis & { __kxCacheGen?: number };
+function cacheGen(): number { return gg.__kxCacheGen ?? 0; }
+function bumpCacheGen(): void { gg.__kxCacheGen = cacheGen() + 1; }
 
 /* The catalogue screens need two more reference payloads that the rest of
    the Hub never reads — kept in their OWN batch so Home doesn't pay for a
@@ -108,6 +175,7 @@ async function fetchBatch(
   sections: Record<string, string>,
 ): Promise<Record<string, unknown> | null> {
   if (state.inflight) return state.inflight;
+  if (state.body && state.at != null && Date.now() - state.at < BATCH_TTL_MS) return state.body;
   state.inflight = (async () => {
     try {
       const res = await fetch(url, { credentials: "include", cache: "no-store" });
@@ -118,6 +186,10 @@ async function fetchBatch(
         const value = body[section];
         if (value != null && !cache.get(path)?.inflight) cache.set(path, { value, at: now });
       }
+      /* Only a REAL answer is kept: a failed batch must not be served for a
+         minute, and its callers still fall through to their own endpoints. */
+      state.body = body;
+      state.at = now;
       return body;
     } catch {
       return null;
@@ -129,7 +201,33 @@ async function fetchBatch(
 }
 
 async function fetchShell(): Promise<Record<string, unknown> | null> {
-  return fetchBatch(shellState, "/api/shell", SHELL_SECTION);
+  /* WARM START: no fresh body and no flight — serve the localStorage
+     mirror NOW and refresh behind. The paint no longer waits for Tokyo;
+     the network answer (arriving ~1-2 s later) replaces the seeded body
+     and per-key entries through fetchBatch's normal write path, so the
+     stale copy's lifetime is seconds, not the session. The mirror write
+     is generation-guarded: a mutation invalidation that lands mid-refresh
+     wins over the older network answer. */
+  if (!shellState.inflight && !(shellState.body && shellState.at != null && Date.now() - shellState.at < BATCH_TTL_MS)) {
+    const mirror = readShellMirror();
+    if (mirror) {
+      const now = Date.now();
+      shellState.body = mirror;
+      shellState.at = now;
+      for (const [path, section] of Object.entries(SHELL_SECTION)) {
+        const value = mirror[section];
+        if (value != null) cache.set(path, { value, at: now });
+      }
+      const gen = cacheGen();
+      void fetchBatch(shellState, "/api/shell", SHELL_SECTION).then((body) => {
+        if (body && cacheGen() === gen) writeShellMirror(body);
+      });
+      return mirror;
+    }
+  }
+  const body = await fetchBatch(shellState, "/api/shell", SHELL_SECTION);
+  if (body) writeShellMirror(body);
+  return body;
 }
 
 /* Every batch, in one table. A new one is a single entry here plus its route —
@@ -215,8 +313,29 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
  *  second account never reads the first one's reference data). A string clears
  *  every URL that starts with it, which covers query-string variants. */
 export function invalidateCachedGet(urlPrefix?: string): void {
-  if (!urlPrefix) { cache.clear(); return; }
+  /* Bump FIRST: any background shell refresh already in flight must see
+     the new generation and drop its (now stale) answer instead of writing
+     it back over this invalidation. */
+  bumpCacheGen();
+  /* The batch bodies are a cache too, and the whole point of invalidating is
+     that the next read must see the mutation — so they go with the map. A
+     prefix clears the batch that CARRIES that key, since its body holds the
+     stale copy. */
+  if (!urlPrefix) {
+    cache.clear();
+    for (const b of BATCHES) { b.state.body = undefined; b.state.at = undefined; }
+    dropShellMirror();
+    return;
+  }
   for (const key of cache.keys()) {
     if (key.startsWith(urlPrefix)) cache.delete(key);
+  }
+  for (const b of BATCHES) {
+    if (Object.keys(b.map).some((k) => k.startsWith(urlPrefix))) {
+      b.state.body = undefined; b.state.at = undefined;
+      /* The mirror holds the same body the batch just forgot — keeping it
+         would re-seed the stale answer next session. */
+      if (b.state === shellState) dropShellMirror();
+    }
   }
 }

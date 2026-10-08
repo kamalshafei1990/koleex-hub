@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import type { TodoProductRef, ProductRow, DivisionRow, CategoryRow } from "@/types/supabase";
-import { fetchProducts, fetchDivisions, fetchCategories, fetchClassificationIcons } from "@/lib/products-admin";
+import { fetchProductsSlim, fetchTaxonomyAll, fetchClassificationIcons } from "@/lib/products-admin";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
@@ -124,7 +124,12 @@ export default function ProductPicker({
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [icons, setIcons] = useState<Record<string, Record<string, string>>>({});
-  const [loading, setLoading] = useState(true);
+  /* `loaded` marks the first completed fetch; loading derives from it, so
+     the effect never sets state synchronously. Deliberately NOT reset on
+     close: a re-open shows the previous catalog instantly while the effect
+     refreshes it behind — better than a spinner over data we already have. */
+  const [loaded, setLoaded] = useState(false);
+  const loading = open && !loaded;
   const [q, setQ] = useState("");
   const [div, setDiv] = useState("");
   const [cat, setCat] = useState("");
@@ -132,7 +137,6 @@ export default function ProductPicker({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoading(true);
     const metaP = fetch("/api/products/media-thumbs", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { thumbs: {}, models: {} }))
       .then((j: { thumbs?: Record<string, string>; models?: Record<string, string> }) => ({
@@ -141,8 +145,14 @@ export default function ProductPicker({
       }))
       .catch(() => ({ thumbs: {} as Record<string, string>, models: {} as Record<string, string> }));
     const iconsP = fetchClassificationIcons().catch(() => ({} as Record<string, Record<string, string>>));
-    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), metaP, iconsP])
-      .then(([prods, divs, cats, meta, ico]) => {
+    /* fetchProductsSlim = the list projection (name, taxonomy, status): this
+       picker shows a name, a model code and a thumbnail, and the codes and
+       thumbnails come from media-thumbs. fetchProducts() pulled all 88
+       columns per product (978 KB) for the three it read. fetchTaxonomyAll
+       reads the browser's taxonomy mirror, so divisions + categories cost no
+       round trip on a warm Hub instead of two. */
+    Promise.all([fetchProductsSlim(), fetchTaxonomyAll(), metaP, iconsP])
+      .then(([prods, taxo, meta, ico]) => {
         if (cancelled) return;
         const { thumbs, models } = meta;
         setIcons(ico);
@@ -151,18 +161,18 @@ export default function ProductPicker({
             id: p.id,
             name: p.product_name,
             // Model code is the identifier buyers recognise: KOLEEX model_name /
-            // primary_model first, then any legacy SKU.
-            code: models[p.id] ?? p.internal_sku ?? p.legacy_code ?? null,
-            image: thumbs[p.id] ?? p.hero_poster_url ?? p.og_image_url ?? null,
+            // primary_model (media-thumbs carries the first per product).
+            code: models[p.id] ?? null,
+            image: thumbs[p.id] ?? null,
             division_slug: p.division_slug,
             category_slug: p.category_slug,
           })),
         );
-        setDivisions(divs);
-        setCategories(cats);
+        setDivisions(taxo.divisions);
+        setCategories(taxo.categories);
       })
       .catch(() => {})
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => !cancelled && setLoaded(true));
     return () => {
       cancelled = true;
     };
@@ -213,6 +223,20 @@ export default function ProductPicker({
       .sort((a, b) => (a.image ? 0 : 1) - (b.image ? 0 : 1));
   }, [products, q, div, cat]);
 
+  /* Esc closes the picker only — captured, so the task form behind it
+     stays open. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const sel = new Set(selectedIds);
@@ -220,7 +244,7 @@ export default function ProductPicker({
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 md:p-4 pt-20 md:pt-24 pb-6 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -232,7 +256,7 @@ export default function ProductPicker({
               <span className="text-[11px] font-semibold text-[var(--accent)]">{selectedIds.length} {t("picker.selectedWord")}</span>
             )}
           </div>
-          <button onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)]">
+          <button type="button" onClick={onClose} aria-label={t("common.done")} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)]">
             <CrossIcon className="h-4 w-4" />
           </button>
         </div>
@@ -243,6 +267,7 @@ export default function ProductPicker({
             <SearchIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
             <input
               autoFocus
+              aria-label={t("picker.search")}
               className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
               placeholder={t("picker.search")}
               value={q}
@@ -274,6 +299,7 @@ export default function ProductPicker({
                   <button
                     key={p.id}
                     type="button"
+                    aria-pressed={isSel}
                     onClick={() => onToggle({ id: p.id, name: p.name, code: p.code })}
                     className={`group relative text-start rounded-xl border overflow-hidden transition-all ${
                       isSel
@@ -284,7 +310,7 @@ export default function ProductPicker({
                     <div className="aspect-square w-full bg-white flex items-center justify-center overflow-hidden p-2">
                       {p.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
+                        <img src={p.image} alt={p.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <PackageIcon className="h-8 w-8 text-black/20" />
                       )}
@@ -316,7 +342,7 @@ export default function ProductPicker({
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between px-4 md:px-5 py-3 border-t border-[var(--border-subtle)]">
           <span className="text-[11px] text-[var(--text-ghost)]">{loading ? "" : `${filtered.length} ${t("picker.productsWord")}`}</span>
-          <button onClick={onClose} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
+          <button type="button" onClick={onClose} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
             {t("common.done")}
           </button>
         </div>

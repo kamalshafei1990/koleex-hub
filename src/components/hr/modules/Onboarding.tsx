@@ -41,7 +41,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function OnboardingModule({ employees, t, lang }: HRModuleProps) {
+export default function OnboardingModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [boardType, setBoardType] = useState<"onboarding" | "offboarding">("onboarding");
   const [onboardChecklists, setOnboardChecklists] = useState<ChecklistRow[]>([]);
@@ -164,7 +164,7 @@ export default function OnboardingModule({ employees, t, lang }: HRModuleProps) 
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-[18px] font-semibold text-[var(--text-primary)]">

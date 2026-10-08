@@ -21,6 +21,7 @@ import { useSkin } from "@/lib/appearance";
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -47,7 +48,7 @@ const T: Record<string, { en: string; zh: string; ar: string }> = {
   "kq.or": { en: "or", zh: "或", ar: "أو" },
   "kq.textPh": { en: "…or paste raw text / markdown here (meeting notes, a policy, translated pages)", zh: "……或在此粘贴纯文本/Markdown（会议纪要、政策、翻译页）", ar: "…أو ألصق نصاً/ماركداون هنا (محاضر، سياسة، صفحات مترجمة)" },
   "kq.limit1": { en: "Text-based PDFs are read page by page (units keep their page numbers).", zh: "文本型 PDF 按页读取（单元保留页码）。", ar: "ملفات PDF النصية تُقرأ صفحةً صفحة (الوحدات تحفظ أرقام صفحاتها)." },
-  "kq.limit2": { en: "IMAGE-ONLY catalogs (designed pages with no text layer) need OCR first — ask Claude to ingest them, like the YILI catalog was.", zh: "纯图片目录（无文本层的设计页）需先 OCR——可让 Claude 代为导入，如 YILI 目录。", ar: "الكتالوجات المصوّرة (صفحات مصممة بلا طبقة نص) تحتاج OCR أولاً — اطلب من Claude إدخالها كما جرى مع كتالوج YILI." },
+  "kq.limit2": { en: "IMAGE-ONLY catalogs (designed pages with no text layer) need OCR first — ask the Koleex AI team to ingest them, like the YILI catalog was.", zh: "纯图片目录（无文本层的设计页）需先 OCR——请联系 Koleex AI 团队代为导入，如 YILI 目录。", ar: "الكتالوجات المصوّرة (صفحات مصممة بلا طبقة نص) تحتاج OCR أولاً — اطلب من فريق Koleex AI إدخالها كما جرى مع كتالوج YILI." },
   "kq.limit3": { en: "Web pages: one page per ingest, up to 2 MB; JS-rendered pages are not supported yet.", zh: "网页：每次导入一页，上限 2 MB；暂不支持 JS 渲染页面。", ar: "صفحات الويب: صفحة واحدة لكل إدخال بحد 2MB؛ الصفحات المولّدة بجافاسكربت غير مدعومة بعد." },
   "kq.limit4": { en: "Nothing reaches Koleex AI until YOU approve the units below — drafts are invisible to it.", zh: "在你批准之前，任何内容都不会进入 Koleex AI——草稿对它不可见。", ar: "لا شيء يصل كوليكس AI قبل اعتمادك للوحدات — المسودات غير مرئية له." },
   "kq.afterIngest": { en: "After ingest: review the units on the right, then Approve — approved units become Koleex AI's knowledge in the retrieval phase.", zh: "导入后：在右侧审阅单元并批准——已批准的单元将在检索阶段成为 Koleex AI 的知识。", ar: "بعد الإدخال: راجع الوحدات يميناً ثم اعتمد — المعتمَد يصبح معرفة كوليكس AI في مرحلة الاسترجاع." },
@@ -136,10 +137,21 @@ export default function AiKnowledgePage() {
     await fetch(`/api/ai/knowledge/qa?id=${id}`, { method: "DELETE", credentials: "include" });
   }, []);
 
+  /* SUPER ADMIN, OR AN ACCOUNT HE HAS GRANTED. This used to be a bare
+     is_super_admin check, which made the bench his-or-nobody's — there was no
+     third state to express. "AI Knowledge" is a governable module now, so the
+     question becomes the same one every other app asks, and he can hand it to
+     named accounts from Roles & Permissions without changing code.
+     Deny-by-default still holds: no grant, no entry. */
   useEffect(() => {
-    fetch("/api/me", { credentials: "include" })
+    fetch("/api/me/permitted-modules", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setAllowed(!!j?.is_super_admin))
+      .then((j) => setAllowed(
+        !!j?.is_super_admin ||
+        (Array.isArray(j?.modules) && j.modules.some(
+          (m: string) => String(m).toLowerCase() === "ai knowledge",
+        )),
+      ))
       .catch(() => setAllowed(false));
   }, []);
 
@@ -219,7 +231,7 @@ export default function AiKnowledgePage() {
 
   if (allowed === false) {
     /* Owner rule: this bench must not even LOOK like a page to anyone
-       but the super admin — silent redirect, no denial screen. */
+       without access — silent redirect, no denial screen. */
     if (typeof window !== "undefined") window.location.replace("/ai");
     return null;
   }
@@ -239,9 +251,9 @@ export default function AiKnowledgePage() {
       )}
       <div className="relative z-[1] w-full px-4 md:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
-          <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")}
-            className="kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
-            <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
+          <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")} className={BACK_CHROME}>
+            <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+            <span className="hidden text-[12px] font-medium sm:inline">Koleex AI</span>
           </Link>
           <BookOpenIcon className="h-5 w-5 text-[var(--text-muted)]" />
           <div className="min-w-0">

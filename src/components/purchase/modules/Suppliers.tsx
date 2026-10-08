@@ -5,10 +5,10 @@
    shared `contacts` table where `supplier_type` is set, joined with
    `vendor_payments` for the spend rollup. */
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, sectionTitleCls, linkBtnCls } from "../shared";
+import { cardCls, formatMoney, sectionTitleCls, linkBtnCls, usePurchaseList } from "../shared";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -24,31 +24,19 @@ type Supplier = {
 };
 
 export default function SuppliersModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Supplier[]>([]);
-  const [spendBySupplier, setSpend] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=suppliers", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { rows: [], payments: [] }) as {
-        rows: Supplier[];
-        payments: { supplier_id: string | null; amount: number | null }[];
-      };
-      if (cancelled) return;
-
-      setRows(data.rows);
-      const m: Record<string, number> = {};
-      for (const row of data.payments) {
-        if (!row.supplier_id) continue;
-        m[row.supplier_id] = (m[row.supplier_id] || 0) + (Number(row.amount) || 0);
-      }
-      setSpend(m);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{
+    rows: Supplier[];
+    payments: { supplier_id: string | null; amount: number | null }[];
+  }>("suppliers");
+  const rows = data?.rows ?? [];
+  const spendBySupplier = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const row of data?.payments ?? []) {
+      if (!row.supplier_id) continue;
+      m[row.supplier_id] = (m[row.supplier_id] || 0) + (Number(row.amount) || 0);
+    }
+    return m;
+  }, [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

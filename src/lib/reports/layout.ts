@@ -20,6 +20,7 @@
 
 import { BORDER, COLOR, PAGE, SPACE, classificationFor, typeCss } from "./design-system";
 import { formatDate, formatDateTime, escapeHtml, escapeAttr } from "./formatters";
+import { legalNameEn } from "@/lib/legal-name";
 import type {
   ReportPayload,
   ReportSummaryItem,
@@ -144,7 +145,7 @@ function corporateIdentityLines(tenantName: string): string[] {
   const isKoleex = tenantName.toLowerCase().includes("koleex");
   if (isKoleex) {
     return [
-      "KOLEEX International Corporation Taizhou Co., Ltd.",
+      legalNameEn(),
       "Taizhou, Zhejiang, China",
       "finance@koleexgroup.com  ·  koleexgroup.com",
     ];

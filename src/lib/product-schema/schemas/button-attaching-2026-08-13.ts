@@ -39,7 +39,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -137,7 +136,6 @@ export const BUTTON_ATTACHING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };

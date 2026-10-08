@@ -163,7 +163,7 @@ export default function PolicySidebar({ mobileOpen, onMobileClose }: { mobileOpe
           />
           {/* Drawer */}
           <aside
-            className="kx-below-header fixed left-0 top-14 z-50 h-[calc(100vh-var(--kx-header-h,3.5rem))] w-[280px] overflow-y-auto border-r lg:hidden"
+            className="kx-below-header kx-glass-drawer fixed left-0 top-14 z-50 h-[calc(100vh-var(--kx-header-h,3.5rem))] w-[280px] overflow-y-auto border-r lg:hidden"
             style={{
               borderColor: "var(--border-subtle)",
               background: "var(--bg-primary)",

@@ -13,7 +13,7 @@ export default function AccountDetailPage() {
       {id ? (
         <AccountDetail accountId={id} />
       ) : (
-        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
           <p className="text-[var(--text-dim)]">No account selected.</p>
         </div>
       )}

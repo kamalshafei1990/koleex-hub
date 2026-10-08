@@ -27,7 +27,7 @@
    --------------------------------------------------------------------------- */
 
 /** Auth shape this guard needs (structural subset of ServerAuthContext). */
-export interface CqeAuth {
+interface CqeAuth {
   account_id: string;
   is_super_admin: boolean;
   role_id?: string | null;

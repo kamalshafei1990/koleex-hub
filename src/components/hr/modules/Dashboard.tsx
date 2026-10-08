@@ -33,12 +33,6 @@ import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
-import StarIcon from "@/components/icons/ui/StarIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
-import WalletIcon from "@/components/icons/ui/WalletIcon";
-import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
-import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import KpiCard from "@/components/ui/KpiCard";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -47,7 +41,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function DashboardModule({ employees, t, lang, setActiveTab }: HRModuleProps) {
+export default function DashboardModule({ t }: HRModuleProps) {
   /* ── state ── */
   const [dashStats, setDashStats] = useState<HrDashboardStats | null>(null);
   const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);
@@ -98,7 +92,7 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── KPI cards — canonical monochrome KpiCard, same as every other app ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard

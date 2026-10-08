@@ -8,8 +8,8 @@ import "server-only";
    session account — never a client-supplied id:
 
      · messages[&archived=1][&limit=]  → the caller's inbox (+ sender join)
-     · unread                          → unread, non-archived count
-     · unreadTasks                     → unread to-do assignment count
+     · messages&snoozed=1              → what the caller put off until later
+     · badges                          → { unread, unreadTasks } in one trip
 
    Freshness is driven by server Broadcast pings on inbox:account:<id> (see
    /api/inbox/mutate + realtime-broadcast.ts), not anon postgres_changes.
@@ -18,6 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { notificationTypeDef } from "@/lib/notification-types";
 
 const INBOX = "inbox_messages";
 
@@ -58,6 +59,26 @@ function flattenSender(raw: SenderJoin) {
    read their todo ids, ask which of those are still open, mark the rest read.
    Missing ids (deleted tasks) are stale by definition. Marked READ, never
    deleted — the message stays in the inbox history where it belongs. */
+/* ── RETENTION — the inbox must not become an archive ──────────────────────
+   2,010 rows had accumulated by the day the owner called the system broken;
+   they were wiped once (scripts/reset-notifications.mts), and this keeps the
+   table from growing back. A notification is a PROMPT, not a record — the
+   audit log and each module's own history hold the records. Read messages
+   older than 60 days and archived ones older than 30 are deleted whenever
+   this account loads its full inbox. Scoped to the caller's own rows,
+   fire-and-forget, and on the messages branch only — badge polls (the hot
+   path, every account each minute) never pay for it. */
+function pruneOldMessages(me: string): void {
+  const readCutoff = new Date(Date.now() - 60 * 86400_000).toISOString();
+  const archCutoff = new Date(Date.now() - 30 * 86400_000).toISOString();
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("read_at", "is", null).lt("created_at", readCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune read]", error.message); });
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("archived_at", "is", null).lt("archived_at", archCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune archived]", error.message); });
+}
+
 async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
   try {
     const { data: pending } = await supabaseServer
@@ -65,7 +86,14 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
       .select("id, metadata")
       .eq("recipient_account_id", me)
       .eq("category", "task")
-      .eq("metadata->>type", "todo_assignment")
+      /* ⚠️ NO type filter — deliberately. This used to say
+         `metadata->>type = todo_assignment`, and that one line was the
+         owner's "the bell still doesn't work": his daily tasks are all
+         RECURRING, whose rows carry type=todo_recurring, so finishing every
+         task cleared nothing and the bell never went quiet on its own.
+         Approval-decision rows had the same hole. Every task notification
+         that names a todo_id reconciles against that todo, whatever its
+         type. */
       .is("read_at", null)
       .is("archived_at", null)
       .limit(500);
@@ -85,8 +113,10 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
         .map((t) => t.id),
     );
 
+    /* Only rows that NAME a todo can be verified against one; a task row
+       without todo_id is left alone rather than guessed at. */
     const staleIds = rows
-      .filter((r) => !r.metadata?.todo_id || !stillOpen.has(r.metadata.todo_id))
+      .filter((r) => r.metadata?.todo_id && !stillOpen.has(r.metadata.todo_id))
       .map((r) => r.id);
     if (!staleIds.length) return;
 
@@ -114,6 +144,7 @@ export async function GET(req: Request) {
         /* Reconcile here too, so opening the list shows finished work as read
            rather than leaving the user to clear rows by hand. */
         await reconcileFinishedTaskNotifications(me);
+        pruneOldMessages(me);
         const includeArchived = url.searchParams.get("archived") === "1";
         /* 300 cap serves the bell's "Show all" view — slim rows are ~200B
            each, so the worst case stays ~60KB. */
@@ -139,14 +170,49 @@ export async function GET(req: Request) {
           .order("created_at", { ascending: false })
           .limit(limit);
         if (!includeArchived) q = q.is("archived_at", null);
+        /* Snoozed rows (lib/server/inbox-snooze) are out of every list until
+           they wake — except the "Later" view, which lists only them, the
+           soonest back first. */
+        q = url.searchParams.get("snoozed") === "1"
+          ? q.not("snoozed_until", "is", null).is("archived_at", null)
+          : q.is("snoozed_until", null);
         const { data, error } = await q;
         if (error) throw new Error(error.message);
         const rows = ((data ?? []) as unknown as Array<Record<string, unknown> & { sender: SenderJoin }>).map((row) => {
           const { sender: _s, ...base } = row;
           void _s;
           if (slim) {
-            const meta = base.metadata as { type?: unknown } | null;
-            base.metadata = meta && typeof meta === "object" && meta.type != null ? { type: meta.type } : {};
+            /* Keep `kind` as well as `type`. The trim exists to drop fat
+               payloads, not classification: classifyInboxActivity types a row
+               from EITHER key, because person-targeted notifications write
+               metadata.type while notifySuperAdmins writes metadata.kind
+               ("new_device", audit actions…). Keeping only `type` stripped
+               every super-admin alert down to {} before it reached the
+               client — measured on the live inbox, 101 of 106 messages — so
+               the bell could not type them: its filter row showed nothing but
+               "All", the Security chip never appeared, and those rows took
+               the default chime. Two keys, both short strings. */
+            /* …and `tpl`: the template the bell renders in the reader's
+               language (lib/notification-templates) — a key and a few short
+               values, never a payload. */
+            /* …and `first_at`: when a request was first sent, once a reminder
+               has brought it back to the top (lib/server/inbox-resurface) —
+               the bell's "Needs you" says how long it has waited from it. */
+            /* …and `escalated_for`: on a Super Admin's copy of a request
+               that waited three days (lib/server/approval-reminders), whom
+               it waits on — a few names. */
+            const meta = base.metadata as { type?: unknown; kind?: unknown; tpl?: unknown; first_at?: unknown; escalated_for?: unknown } | null;
+            if (meta && typeof meta === "object") {
+              const trimmed: Record<string, unknown> = {};
+              if (meta.type != null) trimmed.type = meta.type;
+              if (meta.kind != null) trimmed.kind = meta.kind;
+              if (meta.tpl != null) trimmed.tpl = meta.tpl;
+              if (typeof meta.first_at === "string") trimmed.first_at = meta.first_at;
+              if (typeof meta.escalated_for === "string") trimmed.escalated_for = meta.escalated_for;
+              base.metadata = trimmed;
+            } else {
+              base.metadata = {};
+            }
           }
           const sender = flattenSender(row.sender);
           return { ...base, sender: sender ? { ...sender, avatar_url: sender.avatar_url ?? null } : null };
@@ -154,50 +220,13 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, data: rows });
       }
 
-      case "unread": {
-        await reconcileFinishedTaskNotifications(me);
-        const { count, error } = await supabaseServer
-          .from(INBOX)
-          .select("*", { count: "exact", head: true })
-          .eq("recipient_account_id", me)
-          .is("read_at", null)
-          .is("archived_at", null);
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 }, {
-          // Badge counts feed the home/header; a short SWR cache collapses the
-          // repeated (realtime-triggered) refetches to one round-trip. Realtime
-          // pings still refresh them; the count can lag a few seconds at most.
-          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
-        });
-      }
-
-      case "unreadTasks": {
-        await reconcileFinishedTaskNotifications(me);
-        const { count, error } = await supabaseServer
-          .from(INBOX)
-          .select("*", { count: "exact", head: true })
-          .eq("recipient_account_id", me)
-          .eq("category", "task")
-          .eq("metadata->>type", "todo_assignment")
-          .is("read_at", null)
-          .is("archived_at", null);
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 }, {
-          // Badge counts feed the home/header; a short SWR cache collapses the
-          // repeated (realtime-triggered) refetches to one round-trip. Realtime
-          // pings still refresh them; the count can lag a few seconds at most.
-          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
-        });
-      }
-
       /* Both badge counts in ONE round trip.
 
-         `unread` and `unreadTasks` are polled once a minute each, by every
-         signed-in user, on every screen — together they were the two most
-         called functional routes in production. They read the same table
-         with the same scope, so asking twice bought nothing but a second
-         border crossing for users in China. The two counts still exist
-         separately above for callers that need only one. */
+         They used to be two resources (`unread`, `unreadTasks`), polled once
+         a minute each by every signed-in user on every screen — together the
+         two most called functional routes in production, reading the same
+         table with the same scope. Every caller moved to this one; the
+         separate resources were retired once nothing asked for them. */
       case "badges": {
         await reconcileFinishedTaskNotifications(me);
         const base = () => supabaseServer
@@ -205,15 +234,44 @@ export async function GET(req: Request) {
           .select("*", { count: "exact", head: true })
           .eq("recipient_account_id", me)
           .is("read_at", null)
-          .is("archived_at", null);
-        const [unreadRes, tasksRes] = await Promise.all([
+          .is("archived_at", null)
+          /* A snoozed row is unread but put off: it counts once it wakes. */
+          .is("snoozed_until", null);
+        const [unreadRes, tasksRes, typesRes] = await Promise.all([
           base(),
-          base().eq("category", "task").eq("metadata->>type", "todo_assignment"),
+          /* All task categories — the type filter here undercounted for the
+             same reason the reconcile under-cleared (recurring + approval
+             rows are tasks too). */
+          base().eq("category", "task"),
+          /* Each unread row's type only (two short strings), for the Home
+             tiles' per-app numbers below. */
+          supabaseServer
+            .from(INBOX)
+            .select("type:metadata->>type, kind:metadata->>kind")
+            .eq("recipient_account_id", me)
+            .is("read_at", null)
+            .is("archived_at", null)
+            .is("snoozed_until", null)
+            .limit(1000),
         ]);
         if (unreadRes.error) throw new Error(unreadRes.error.message);
         if (tasksRes.error) throw new Error(tasksRes.error.message);
+        /* Unread notifications per app — the number on each Home tile. The
+           app is the registry's (lib/notification-types); security alerts
+           are left out as the bell's All tab leaves them out: they have
+           their own tab, and they are not work in an app. A failed read
+           only loses the tiles' numbers, never the counts above. */
+        const byApp: Record<string, number> = {};
+        for (const r of (typesRes.data ?? []) as Array<{ type: string | null; kind: string | null }>) {
+          const app = notificationTypeDef(r.type ?? r.kind)?.app;
+          if (!app || app === "activity-monitor") continue;
+          byApp[app] = (byApp[app] ?? 0) + 1;
+        }
         return NextResponse.json(
-          { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0 } },
+          { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0, byApp } },
+          // Badge counts feed the home/header; a short SWR cache collapses the
+          // repeated (realtime-triggered) refetches to one round-trip. Realtime
+          // pings still refresh them; the count can lag a few seconds at most.
           { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } },
         );
       }

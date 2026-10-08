@@ -77,7 +77,7 @@ export default function VisualAssetCard({
         className={`absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
             ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-            : "border-[var(--border-color)] bg-[var(--bg-primary)]/70 text-transparent opacity-0 group-hover:opacity-100"
+            : "border-[var(--border-color)] bg-black/60 text-transparent opacity-0 group-hover:opacity-100"
         }`}
       >
         <CheckIcon size={11} />

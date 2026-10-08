@@ -1,13 +1,11 @@
 import { forwardRef } from "react";
 
-/* Travel — a passport booklet: cover, an emblem, and the two machine-readable
-   lines at the foot of the data page. Documents, not a plane, because the app
-   is about the paperwork.
-
-   Drawn from primitives rather than one long traced path. navigation.ts is
-   imported by EVERY route, so this file's bytes land in the shared baseline of
-   all 40 of them — the first draft traced a detailed globe and pushed
-   commercial-policy past its budget by 1 KB. */
+/* Travel — the plane glyph from the Hub's own icon set (RrIcon "plane"),
+   lifted verbatim so the launcher tile and any RrIcon usage draw the exact
+   same shape. The owner asked for the plane specifically: the app sits next
+   to Sales and Purchases in the launcher, and at tile size a plane says
+   "travel" instantly where the earlier passport booklet read as a generic
+   document. Same outline family (fill: currentColor) as every other icon. */
 const TravelIcon = forwardRef<
   SVGSVGElement,
   { size?: number | string; className?: string; style?: React.CSSProperties; strokeWidth?: number }
@@ -20,19 +18,12 @@ const TravelIcon = forwardRef<
       viewBox="0 0 24 24"
       width={s}
       height={s}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
       className={className}
       style={style}
       {...rest}
     >
-      <rect x="4" y="2" width="16" height="20" rx="2.5" />
-      <circle cx="12" cy="9" r="3.2" />
-      <path d="M12 5.8v6.4M8.8 9h6.4" />
-      <path d="M8 16.4h8M8 19h5" />
+      <path d="M21,10H17.693L13.446,1.563A3,3,0,0,0,10.812,0H10.63A2.63,2.63,0,0,0,8.1,3.361L10.028,10H7.644a2.982,2.982,0,0,1-2.122-.879L4.105,7.7a2.409,2.409,0,0,0-2.814-.433A2.319,2.319,0,0,0,.125,8.689a2.525,2.525,0,0,0,.228,1.966L1.967,13.48A5.012,5.012,0,0,0,6.308,16h3.711L8.351,20.447A2.629,2.629,0,0,0,10.812,24a2.972,2.972,0,0,0,2.605-1.513L17.464,16H21a3,3,0,0,0,0-6ZM10.025,2.805A.63.63,0,0,1,10.63,2h.182a.989.989,0,0,1,.863.491L15.455,10H12.11ZM21,14H16.909a1,1,0,0,0-.848.471L11.69,21.479a1,1,0,0,1-.878.521.628.628,0,0,1-.588-.85l2.174-5.8A1,1,0,0,0,11.461,14H6.308a3,3,0,0,1-2.6-1.512L2.089,9.662a.523.523,0,0,1-.047-.4A.323.323,0,0,1,2.2,9.051.437.437,0,0,1,2.4,9a.415.415,0,0,1,.287.118l1.417,1.417A4.972,4.972,0,0,0,7.644,12H21a1,1,0,0,1,0,2Z" />
     </svg>
   );
 });

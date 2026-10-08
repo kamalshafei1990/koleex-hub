@@ -61,7 +61,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -147,7 +146,6 @@ export const ROTARY_HEAT_PRESS_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(20),
     physicalGroup(30),
-    packingShippingGroup(40),
     safetyComplianceGroup(50),
   ],
 };
@@ -241,7 +239,6 @@ export const HEAT_PRESS_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };

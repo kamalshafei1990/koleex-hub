@@ -1,0 +1,658 @@
+{
+ "section": "video",
+ "items": {
+  "product-videos": {
+   "specs": [
+    {
+     "k": "Kinds and lengths",
+     "v": "Hero film · feature demo (60–120 s, 16:9 plus a 9:16 cut) · how-to / tutorial (1–5 min, 16:9) · installation and setup · maintenance · troubleshooting · unboxing"
+    },
+    {
+     "k": "The KOLEEX film",
+     "v": "The machine on pure black under one top light, turning slowly; a close-up of the needle and the stitch; one word on screen — then the logo (ch. 70, 64)"
+    },
+    {
+     "k": "Camera",
+     "v": "Slow — a smooth orbit or push-in on a slider or gimbal; long holds of 3–6 s; cuts on the beat, short fades"
+    },
+    {
+     "k": "Shooting",
+     "v": "4K (3840 × 2160) where possible, 1080p minimum; 25 fps (50 for slow motion); tripod or gimbal — never handheld walking shots; shoot horizontal with the subject centred so a vertical cut can be taken (ch. 70)"
+    },
+    {
+     "k": "Formats",
+     "v": "16:9 for YouTube, the website, presentations and fair screens · 9:16 for TikTok, Douyin, Reels, Stories, WeChat Channels, WhatsApp Status · 1:1 and 4:5 for feeds (ch. 70)"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    },
+    {
+     "k": "Intro and outro",
+     "v": "Intro 2–3 s (Focus, the short melody), outro 3–4 s (the group lockup, one contact) — ch. 71, 73"
+    },
+    {
+     "k": "Music",
+     "v": "Product film: calm electronic with the stitch rhythm · how-to: very quiet or none; always 15–20 dB below the voice"
+    }
+   ],
+   "logo": "Focus at the start or the end; a small corner mark only where the platform needs it.",
+   "do": [
+    "Our own machines, filmed by us",
+    "The model name as in Koleex Hub"
+   ],
+   "dont": [
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)",
+    "Shaky handheld shots; vertical video with black bars",
+    "Prices"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    71,
+    64
+   ]
+  },
+  "company-videos": {
+   "specs": [
+    {
+     "k": "Kinds and lengths",
+     "v": "Brand film · company profile video · founder message (1–2 min, 16:9 and 9:16) · factory / warehouse tour (60–90 s) · recruitment video · team and culture"
+    },
+    {
+     "k": "Facts",
+     "v": "Every number with a source we can show; only real, current offices and people (ch. 102)"
+    },
+    {
+     "k": "People",
+     "v": "Nobody appears without written permission (ch. 66)"
+    },
+    {
+     "k": "Shooting",
+     "v": "4K (3840 × 2160) where possible, 1080p minimum; 25 fps (50 for slow motion); tripod or gimbal — never handheld walking shots; shoot horizontal with the subject centred so a vertical cut can be taken (ch. 70)"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    },
+    {
+     "k": "Intro and outro",
+     "v": "Intro 2–3 s (Focus, the short melody), outro 3–4 s (the group lockup, one contact) — ch. 71, 73"
+    },
+    {
+     "k": "Music",
+     "v": "Founder and people stories: soft piano or none — the voice leads; factory: the machines' own sound"
+    }
+   ],
+   "logo": "Focus at the start or the end (ch. 73).",
+   "do": [
+    "Staff in uniform on camera (ch. 122)"
+   ],
+   "dont": [
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)",
+    "Supplier names or factories shown as ours"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    102,
+    66
+   ]
+  },
+  "customer-videos": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Testimonial interview (2–3 min, 16:9) · machine working at the customer · before / after production"
+    },
+    {
+     "k": "Permission",
+     "v": "The customer's written permission for their name, logo, factory and people — before filming (ch. 131)"
+    },
+    {
+     "k": "Numbers",
+     "v": "Gains as the customer measured them"
+    },
+    {
+     "k": "Sound",
+     "v": "A clip-on microphone for anyone speaking; 10 s of room silence recorded"
+    },
+    {
+     "k": "Shooting",
+     "v": "4K (3840 × 2160) where possible, 1080p minimum; 25 fps (50 for slow motion); tripod or gimbal — never handheld walking shots; shoot horizontal with the subject centred so a vertical cut can be taken (ch. 70)"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    }
+   ],
+   "logo": "Focus at the start or the end.",
+   "do": [
+    "The customer's own words, lightly edited"
+   ],
+   "dont": [
+    "Filming without written permission",
+    "Competitors' machines in the frame",
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    131,
+    66
+   ]
+  },
+  "event-videos": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Teaser · booth loop (silent) · live highlights · recap film (30–60 s, 9:16 and 16:9) · speaker recordings"
+    },
+    {
+     "k": "Booth loop",
+     "v": "Silent, subtitled, the machine the star — it plays all day on the booth screen"
+    },
+    {
+     "k": "People",
+     "v": "Visitors' badges unreadable, no close-up faces without consent, no competitors' booths (ch. 68)"
+    },
+    {
+     "k": "Music",
+     "v": "Launches and fairs: cinematic — deep hits and a rising pad"
+    },
+    {
+     "k": "Shooting",
+     "v": "4K (3840 × 2160) where possible, 1080p minimum; 25 fps (50 for slow motion); tripod or gimbal — never handheld walking shots; shoot horizontal with the subject centred so a vertical cut can be taken (ch. 70)"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    }
+   ],
+   "logo": "Focus at the start or the end; the loop ends on the logo.",
+   "do": [
+    "The recap posted within 48 hours"
+   ],
+   "dont": [
+    "Filming other companies' booths",
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    68,
+    115
+   ]
+  },
+  "training-videos": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Technician course episodes · operator training · dealer sales training · Hub how-to videos"
+    },
+    {
+     "k": "Length",
+     "v": "How-to: 1–5 minutes, one topic per video"
+    },
+    {
+     "k": "Formats",
+     "v": "16:9 for YouTube, the website, presentations and fair screens · 9:16 for TikTok, Douyin, Reels, Stories, WeChat Channels, WhatsApp Status · 1:1 and 4:5 for feeds (ch. 70)"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    },
+    {
+     "k": "Access",
+     "v": "Technician and dealer training shared only with them"
+    }
+   ],
+   "logo": "Focus at the start; a small corner mark on screen recordings.",
+   "do": [
+    "The same steps and numbers as the manual"
+   ],
+   "dont": [
+    "Public links to technician-only videos"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    113
+   ]
+  },
+  "short-vertical-clips": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Machine in 10 seconds · tip of the week · behind the scenes · trend-style clip"
+    },
+    {
+     "k": "Length",
+     "v": "7–15 s or 30 s (short: 15–30 s, 9:16 — ch. 70)"
+    },
+    {
+     "k": "Size",
+     "v": "1080 × 1920; safe areas: top 250 · bottom 420 · right 150 px"
+    },
+    {
+     "k": "Sound",
+     "v": "The machine's real sound; music only from the platform's licensed library"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Burned in"
+    }
+   ],
+   "logo": "In the first or last second (ch. 84).",
+   "do": [
+    "The machine is the star"
+   ],
+   "dont": [
+    "A TikTok re-uploaded to Douyin",
+    "Gimmicks: shocked faces, fake reactions",
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    84
+   ]
+  },
+  "animated-explainers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "2D motion graphics · infographic animation"
+    },
+    {
+     "k": "Lengths",
+     "v": "6 s · 15 s · 30 s · 60 s · 2–3 min"
+    },
+    {
+     "k": "Look",
+     "v": "Flat 2D, black and white, the grey charts with one key value (ch. 61); our own photographs for the machines"
+    },
+    {
+     "k": "Motion",
+     "v": "Words arrive with a slow fade and a 16–24 px rise over 800–1200 ms; numbers count up once, charts grow once — nothing loops (ch. 72)"
+    }
+   ],
+   "logo": "Focus at the end.",
+   "do": [
+    "2D only — flat graphics on black (owner)"
+   ],
+   "dont": [
+    "Drawings of machines — our own photographs and film only (owner, 27/09/2026)",
+    "3D renders, spins, glitch effects, wipes"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    72,
+    61,
+    60
+   ]
+  },
+  "live-streams-and-webinars": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Stream frame / overlay · waiting screen · speaker lower thirds · webinar slide template"
+    },
+    {
+     "k": "Slides",
+     "v": "16:9 1920 × 1080, the presentation template (ch. 90)"
+    },
+    {
+     "k": "Lower thirds",
+     "v": "Name Inter SemiBold, title Inter Regular at 70%; bottom-left (bottom-right in Arabic), 4–5 s, 400 ms fades"
+    },
+    {
+     "k": "Waiting screen",
+     "v": "Black, the title, the start time with its time zone, the logo"
+    }
+   ],
+   "logo": "The small corner logo on the stream; the waiting screen's logo centred.",
+   "do": [
+    "A \"LIVE\" badge only while live"
+   ],
+   "dont": [
+    "Personal phone numbers on screen"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    71,
+    90
+   ]
+  },
+  "logo-animation": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "Focus: the white logo from a 14 px blur and 110% scale to sharp and 100%, fading in, 0.3–2.1 s, expo curve; hold to 3.5 s with the last note of the melody"
+    },
+    {
+     "k": "Versions",
+     "v": "Intro 3 s · outro with the logo and the website · a short sting (a plain fade in or out, for short clips) · vertical version"
+    },
+    {
+     "k": "Ground",
+     "v": "Black #000000; on white the same move with the black logo"
+    },
+    {
+     "k": "Sound",
+     "v": "With the KOLEEX melody, or silent"
+    },
+    {
+     "k": "Files",
+     "v": "MP4 1080p and 4K on black and on white, and a transparent file for editors"
+    }
+   ],
+   "logo": "Only Focus or a plain fade.",
+   "do": [
+    "The files from Downloads — never rebuilt by an editor"
+   ],
+   "dont": [
+    "Animations that take the logo apart",
+    "Spins, 3D turns, glitches, the K alone"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    73,
+    74
+   ]
+  },
+  "titles-and-lower-thirds": {
+   "specs": [
+    {
+     "k": "Lower third",
+     "v": "Name Inter SemiBold, title Inter Regular at 70% size; bottom-left (bottom-right in Arabic), inside the safe area; 4–5 s, a 400 ms fade in and out"
+    },
+    {
+     "k": "Titles",
+     "v": "One to three words at a time, Inter SemiBold, silver or white; a slow fade and a small rise"
+    },
+    {
+     "k": "Kinds",
+     "v": "Name + job title · location / event · chapter title card · big statement · numbers / specs call-out"
+    },
+    {
+     "k": "Style",
+     "v": "White on dark · black on light"
+    }
+   ],
+   "logo": "None in lower thirds — the corner mark carries it.",
+   "do": [
+    "The job title as in Koleex Hub"
+   ],
+   "dont": [
+    "Coloured boxes or swooshes"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    71,
+    72
+   ]
+  },
+  "subtitles": {
+   "specs": [
+    {
+     "k": "Always",
+     "v": "Always: burned in for social media, an SRT file for YouTube and the website; English plus the market's language (ch. 71)"
+    },
+    {
+     "k": "Type",
+     "v": "Inter SemiBold; Arabic and Chinese in their own families"
+    },
+    {
+     "k": "Size",
+     "v": "48 px on 1920 × 1080 · 42 px on 1080 × 1920"
+    },
+    {
+     "k": "Box",
+     "v": "White text on black at 60%, 8 px padding"
+    },
+    {
+     "k": "Lines",
+     "v": "Two at most, about 42 characters each"
+    },
+    {
+     "k": "Languages",
+     "v": "English plus the market's language; any of the 19 machine languages on request — each reviewed (ch. 30)"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "SRT files uploaded to YouTube in English, Arabic and Chinese"
+   ],
+   "dont": [
+    "Videos without subtitles — most are watched muted"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    71,
+    30
+   ]
+  },
+  "end-card": {
+   "specs": [
+    {
+     "k": "Content",
+     "v": "The group lockup (ch. 43) and one contact — the website, or WhatsApp; a QR where it can be scanned"
+    },
+    {
+     "k": "Length",
+     "v": "3–4 s, on black #000000"
+    },
+    {
+     "k": "Sound",
+     "v": "The KOLEEX melody, outro version"
+    },
+    {
+     "k": "YouTube",
+     "v": "The end screen may add subscribe and the next video"
+    }
+   ],
+   "logo": "The group lockup, centred.",
+   "do": [
+    "One contact"
+   ],
+   "dont": [
+    "Every social account, phone numbers in several countries"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    71,
+    43
+   ]
+  },
+  "corner-logo-and-marks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Small corner logo · \"LIVE\" badge · countdown timer"
+    },
+    {
+     "k": "Place",
+     "v": "Inside the platform's safe area; the same corner through a video"
+    },
+    {
+     "k": "Look",
+     "v": "The full logo in white, small and calm; the LIVE badge only while live"
+    }
+   ],
+   "logo": "The full logo, small, top corner — never the K alone.",
+   "do": [
+    "Kept clear of subtitles and the app's buttons"
+   ],
+   "dont": [
+    "A watermark across the machine",
+    "Moving or blinking marks"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    71
+   ]
+  },
+  "music-and-sound": {
+   "specs": [
+    {
+     "k": "Melody",
+     "v": "D4 · E4 · G4 · A4 → D5 held, over an open fifth D3–A3 — the melody never changes, only instrument, tempo and length (ch. 74)"
+    },
+    {
+     "k": "By style",
+     "v": "Product film: calm electronic · factory: the machines' sound · launch: cinematic · how-to: very quiet or none · people stories: soft piano or none · religious occasions: no music, or calm instrumental"
+    },
+    {
+     "k": "Levels",
+     "v": "Voice about −16 LUFS; music 15–20 dB below the voice; few, soft effects"
+    },
+    {
+     "k": "Licence",
+     "v": "Licensed music only — the source recorded"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "The machine's own sound where it tells the story"
+   ],
+   "dont": [
+    "Unlicensed or trending tracks outside the platform's library",
+    "Loud effects"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    74,
+    70
+   ]
+  },
+  "voice-over": {
+   "specs": [
+    {
+     "k": "Languages",
+     "v": "English, Chinese, Arabic; others on request"
+    },
+    {
+     "k": "Voice",
+     "v": "A calm male or female voice; an AI voice only marked as AI (the workshop's rule)"
+    },
+    {
+     "k": "Level",
+     "v": "Clear and in front — about −16 LUFS (ch. 74)"
+    },
+    {
+     "k": "Script",
+     "v": "Short sentences, the words of the subtitles; reviewed by a native speaker"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "The same script as the subtitles"
+   ],
+   "dont": [
+    "An AI voice passed off as a person",
+    "Hard-sell tone"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    74,
+    30
+   ]
+  },
+  "filming-rules": {
+   "specs": [
+    {
+     "k": "Light and background",
+     "v": "The photography rules (ch. 63–64): the machine on pure black or white, one top light"
+    },
+    {
+     "k": "Camera",
+     "v": "Tripod or gimbal, slow moves, long holds — never handheld walking shots"
+    },
+    {
+     "k": "People",
+     "v": "Nobody filmed without written permission (ch. 66); staff in uniform on camera (ch. 122)"
+    },
+    {
+     "k": "Locations",
+     "v": "Showroom, factory, customer — at the customer only with written permission"
+    },
+    {
+     "k": "Drones",
+     "v": "Not in the book yet — the owner's to set"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "An angle list per machine, the same for every model"
+   ],
+   "dont": [
+    "Stock footage, or AI-generated video of machines, people or places (ch. 70)",
+    "Competitors' machines or booths in the frame"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    63,
+    66
+   ]
+  },
+  "colour-and-finishing": {
+   "specs": [
+    {
+     "k": "Grade",
+     "v": "One preset for all KOLEEX films — neutral, true machine colours; the preset itself is not in the book yet"
+    },
+    {
+     "k": "Export",
+     "v": "25 fps; 4K or 1080p masters; each platform's size and safe area (ch. 70)"
+    },
+    {
+     "k": "Thumbnail",
+     "v": "From the video: the logo top-left, the title in silver on the left, the machine on the right (ch. 71)"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "The same preset for a whole series"
+   ],
+   "dont": [
+    "Coloured grades, heavy filters, glitch effects"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    70,
+    71
+   ]
+  },
+  "video-library": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "File naming rule · library in Koleex Hub · B-roll library (machines, factory, team) · raw footage archive"
+    },
+    {
+     "k": "Names",
+     "v": "By the file-naming rules (ch. 135)"
+    },
+    {
+     "k": "Masters",
+     "v": "The approved final kept as the master (ch. 136); an old copy is never the source"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "Consent forms kept with the footage of the people in it"
+   ],
+   "dont": [
+    "Footage from unknown sources in the library"
+   ],
+   "vendor": "Deliver the master (4K where possible, 1080p minimum, 25 fps), the 16:9 and 9:16 cuts, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves anything new or public-facing (ch. 134).",
+   "book": [
+    135,
+    136
+   ]
+  }
+ }
+}

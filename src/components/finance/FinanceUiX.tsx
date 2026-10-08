@@ -23,7 +23,7 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import RrIcon from "@/components/ui/RrIcon";
 import { type Tone, TONE_TEXT, TONE_CHIP_BG } from "@/components/finance/tone";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_UIX } from "@/lib/translations/finance/uix";
 /* Phase Fix #3 — chart primitives + formatCompact extracted to
    ./charts.tsx so this file no longer drags 540 lines of SVG math
    along with its card / aging / timeline components. The
@@ -579,7 +579,7 @@ export function ModeToggle({
   value: FinanceMode;
   onChange: (v: FinanceMode) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_UIX);
   const opts: { key: FinanceMode; label: string; hint: string }[] = [
     { key: "operational", label: t("uix.mode.operational", "Operational"), hint: t("uix.mode.dailyOps", "Daily ops") },
     { key: "executive",   label: t("uix.mode.executive", "Executive"),     hint: t("uix.mode.strategy", "Strategy")  },
@@ -663,7 +663,7 @@ export function LiquidityMeter({
   d60: number;
   inflowShare: number;     // 0..1 — share of inflow vs outflow
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_UIX);
   const inflowPct = Math.max(4, Math.min(96, inflowShare * 100));
   /* Tone per window */
   const tone = (v: number): string =>
@@ -724,7 +724,7 @@ export function AgingTable({
   buckets: AgingBucketView[];
   currency?: string;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_UIX);
   const total = buckets.reduce((s, b) => s + b.amount, 0);
   const totalCount = buckets.reduce((s, b) => s + b.count, 0);
   const max = Math.max(1, ...buckets.map((b) => b.amount));
@@ -797,7 +797,7 @@ export function TimelineStrip({
   currency?: string;
   max?: number;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_UIX);
   const top = events.slice(0, max);
   const overdueCount = events.filter((e) => e.state === "overdue").length;
   const dueSoonCount = events.filter((e) => e.state === "due_soon").length;

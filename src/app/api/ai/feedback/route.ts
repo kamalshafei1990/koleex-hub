@@ -28,7 +28,7 @@ function asString(v: unknown): string | null {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);

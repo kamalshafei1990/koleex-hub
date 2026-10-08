@@ -57,8 +57,6 @@ import type {
   CourseInsert,
   TrainingRecordInsert,
   HrDocumentInsert,
-  EmployeeRow,
-  PersonRow,
 } from "@/types/supabase";
 
 /* ── Table names ── */
@@ -122,20 +120,6 @@ async function buildEmployeeNameMap(
   return map;
 }
 
-/** Compute business days between two dates (Mon-Fri, simplistic). */
-function computeBusinessDays(start: string, end: string): number {
-  const s = new Date(start);
-  const e = new Date(end);
-  let count = 0;
-  const cur = new Date(s);
-  while (cur <= e) {
-    const day = cur.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
-}
-
 /* ═══════════════════════════════════════════════════
    DASHBOARD AGGREGATIONS
    ═══════════════════════════════════════════════════ */
@@ -183,7 +167,7 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
       supabase
         .from(LEAVE_REQUESTS)
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .in("status", ["pending", "manager_approved"]),
       // Documents expiring within 30 days
       supabase
         .from(HR_DOCUMENTS)
@@ -216,11 +200,47 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
 
     if (absenceRes.error) console.error("[HR Dashboard] Absences:", absenceRes.error.message);
     else stats.today_absences = absenceRes.count || 0;
-  } catch (err: any) {
-    console.error("[HR Dashboard] Unexpected:", err.message);
+  } catch (err: unknown) {
+    console.error("[HR Dashboard] Unexpected:", err instanceof Error ? err.message : err);
   }
 
   return stats;
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE PRESENCE
+   ═══════════════════════════════════════════════════ */
+
+export interface HrModulePresence {
+  recruitment: boolean;
+  training: boolean;
+}
+
+/** Whether the optional modules have anything in them yet. The Recruitment
+ *  and Training tabs stay out of the HR strip until their first row exists
+ *  (owner, 20/09/2026): an empty module is a tab that leads nowhere. Three
+ *  head-only counts in one round trip. A failing count reads as "present",
+ *  so a gateway hiccup never hides a tab that has data behind it. */
+export async function fetchHrModulePresence(): Promise<HrModulePresence> {
+  const head = (table: string) =>
+    supabase.from(table).select("id", { count: "exact", head: true });
+  const has = (r: { error: { message: string } | null; count: number | null }) =>
+    r.error ? true : (r.count ?? 0) > 0;
+
+  try {
+    const [postings, courses, records] = await Promise.all([
+      head(JOB_POSTINGS),
+      head(COURSES),
+      head(TRAINING_RECORDS),
+    ]);
+    return {
+      recruitment: has(postings),
+      training: has(courses) || has(records),
+    };
+  } catch (err: unknown) {
+    console.error("[HR Presence] Unexpected:", err instanceof Error ? err.message : err);
+    return { recruitment: true, training: true };
+  }
 }
 
 export interface ExpiringItem {
@@ -276,7 +296,7 @@ export async function fetchExpiringItems(
 
     // Collect all employee IDs
     const empIds = [
-      ...(visas || []).map((v: any) => v.id),
+      ...((visas || []) as { id: string }[]).map((v) => v.id),
       ...(docs || []).map((d: HrDocumentRow) => d.employee_id),
     ];
     const nameMap = await buildEmployeeNameMap(empIds);
@@ -308,8 +328,8 @@ export async function fetchExpiringItems(
       (a, b) =>
         new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime(),
     );
-  } catch (err: any) {
-    console.error("[Expiring] Unexpected:", err.message);
+  } catch (err: unknown) {
+    console.error("[Expiring] Unexpected:", err instanceof Error ? err.message : err);
   }
 
   return items;
@@ -402,7 +422,7 @@ export async function fetchLeaveRequests(
     .in("id", typeIds);
 
   const typeMap = new Map<string, { name: string; code: string }>(
-    (types || []).map((t: any) => [
+    ((types || []) as { id: string; name: string; code?: string | null }[]).map((t) => [
       t.id as string,
       { name: t.name as string, code: (t.code as string) || "" },
     ]),
@@ -416,106 +436,66 @@ export async function fetchLeaveRequests(
   }));
 }
 
-/** Create a leave request. Auto-computes days from start/end dates. */
+/** Create a leave request on behalf of an employee — HR's path. Since
+ *  Phase B/C this is the server route POST /api/hr/leave: the same day
+ *  count (country calendar), overlap check and first-approver notification
+ *  the self-service path gets, so an HR-filed request is not a second-class
+ *  row. `days` from the caller is ignored — the server counts. */
 export async function createLeaveRequest(
   input: Omit<
     LeaveRequestInsert,
     "days" | "status" | "reviewed_by" | "reviewed_at" | "review_notes" | keyof LeaveRequestDetails
   > &
-    /* Detail fields are all nullable — omit them entirely and the row is
-       created exactly as before. */
     Partial<LeaveRequestDetails> & {
       days?: number;
     },
 ): Promise<LeaveRequestRow | null> {
-  const days =
-    input.days ??
-    (input.half_day ? 0.5 : computeBusinessDays(input.start_date, input.end_date));
-
-  const { data, error } = await supabase
-    .from(LEAVE_REQUESTS)
-    .insert({
-      ...input,
-      days,
-      status: "pending",
-      reviewed_by: null,
-      reviewed_at: null,
-      review_notes: null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("[LeaveRequests] Create:", error.message);
+  try {
+    const res = await fetch("/api/hr/leave", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = (await res.json().catch(() => null)) as { request?: LeaveRequestRow; error?: string } | null;
+    if (!res.ok) {
+      console.error("[LeaveRequests] Create:", json?.error ?? res.status);
+      return null;
+    }
+    return json?.request ?? null;
+  } catch (err) {
+    console.error("[LeaveRequests] Create:", err instanceof Error ? err.message : err);
     return null;
   }
-  return data as LeaveRequestRow;
 }
 
-/** Approve or reject a leave request and update balance accordingly. */
+/** Approve or reject a leave request — HR's step. Since Phase B this is a
+ *  server route (/api/hr/leave/[id]/review): the state machine, the balance
+ *  deduction and the notifications to the requester live in ONE place,
+ *  shared with the manager's step on /me. `reviewedBy` is kept for callers
+ *  but the server records its own resolution of the caller. */
 export async function reviewLeaveRequest(
   id: string,
   status: "approved" | "rejected",
-  reviewedBy: string | null,
+  _reviewedBy: string | null,
   notes?: string,
 ): Promise<boolean> {
-  // Get the request first
-  const { data: request, error: fetchErr } = await supabase
-    .from(LEAVE_REQUESTS)
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (fetchErr || !request) {
-    console.error("[LeaveRequests] Review fetch:", fetchErr?.message);
-    return false;
-  }
-
-  const now = new Date().toISOString();
-
-  // Update request status
-  const { error: updateErr } = await supabase
-    .from(LEAVE_REQUESTS)
-    .update({
-      status,
-      reviewed_by: reviewedBy,
-      reviewed_at: now,
-      review_notes: notes || null,
-    })
-    .eq("id", id);
-
-  if (updateErr) {
-    console.error("[LeaveRequests] Review update:", updateErr.message);
-    return false;
-  }
-
-  // If approved, deduct from leave balance
-  if (status === "approved") {
-    const year = new Date(request.start_date).getFullYear();
-
-    const { data: balance, error: balErr } = await supabase
-      .from(LEAVE_BALANCES)
-      .select("*")
-      .eq("employee_id", request.employee_id)
-      .eq("leave_type_id", request.leave_type_id)
-      .eq("year", year)
-      .maybeSingle();
-
-    if (balErr) {
-      console.error("[LeaveBalances] Deduct fetch:", balErr.message);
-    } else if (balance) {
-      const { error: deductErr } = await supabase
-        .from(LEAVE_BALANCES)
-        .update({ used: (balance.used || 0) + request.days })
-        .eq("id", balance.id);
-
-      if (deductErr) {
-        console.error("[LeaveBalances] Deduct:", deductErr.message);
-      }
+  try {
+    const res = await fetch(`/api/hr/leave/${id}/review`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: status === "approved" ? "approve" : "reject", notes: notes ?? null }),
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => null)) as { error?: string } | null;
+      console.error("[LeaveRequests] Review:", j?.error ?? res.status);
     }
+    return res.ok;
+  } catch (err) {
+    console.error("[LeaveRequests] Review:", err instanceof Error ? err.message : err);
+    return false;
   }
-
-  return true;
 }
 
 /** Fetch leave balances for an employee in a given year. */
@@ -545,7 +525,7 @@ export async function fetchLeaveBalances(
     .in("id", typeIds);
 
   const typeMap = new Map<string, string>(
-    (types || []).map((t: any) => [t.id as string, t.name as string]),
+    ((types || []) as { id: string; name: string }[]).map((t) => [t.id, t.name]),
   );
 
   return balances.map((b) => ({
@@ -616,6 +596,193 @@ export async function fetchAttendanceRecords(
     return [];
   }
   return (data as AttendanceRecordRow[]) || [];
+}
+
+/* ── Phase D — payroll runs (server engine; the client only asks) ────── */
+
+export type { RunResult as PayrollRunResult, PayslipBreakdown, PayrollRule } from "@/lib/server/payroll-run";
+
+export interface PayrollRunRow {
+  id: string; period: string; country: string | null; status: "draft" | "approved" | "paid"; currency: string | null;
+  employees: number; total_gross: number; total_net: number; total_employer: number;
+  created_by: string | null; approved_by: string | null; approved_at: string | null; paid_at: string | null; notes: string | null; created_at: string;
+}
+export interface RunPayslipRow extends PayslipRow {
+  payroll_run_id: string | null; currency: string | null;
+  breakdown: import("@/lib/server/payroll-run").PayslipBreakdown | null; employer_contributions: Record<string, number> | null;
+  koleex_employees?: { employee_number: string | null; people?: { full_name?: string; name_alt?: string | null } | { full_name?: string; name_alt?: string | null }[] | null } | null;
+}
+
+const hrJson = async <T,>(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> => {
+  try {
+    const res = await fetch(url, { credentials: "include", cache: "no-store", ...init });
+    const j = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
+    return { ok: res.ok, status: res.status, data: res.ok ? j : null, error: res.ok ? undefined : j?.error ?? `HTTP ${res.status}` };
+  } catch (err) { return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : "network" }; }
+};
+
+export async function fetchPayrollRuns(): Promise<PayrollRunRow[]> {
+  const r = await hrJson<{ runs: PayrollRunRow[] }>("/api/hr/payroll/runs");
+  return r.data?.runs ?? [];
+}
+export async function runPayrollMonth(period: string, country: string | null, deductAbsence = true): Promise<{ ok: boolean; result?: import("@/lib/server/payroll-run").RunResult; error?: string }> {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const r = await hrJson<{ result: import("@/lib/server/payroll-run").RunResult }>("/api/hr/payroll/runs", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period, country, tz, deduct_absence: deductAbsence }),
+  });
+  return r.ok ? { ok: true, result: r.data?.result } : { ok: false, error: r.error };
+}
+export async function fetchPayrollRun(id: string): Promise<{ run: PayrollRunRow; payslips: RunPayslipRow[] } | null> {
+  const r = await hrJson<{ run: PayrollRunRow; payslips: RunPayslipRow[] }>(`/api/hr/payroll/runs/${id}`);
+  return r.data;
+}
+export async function transitionPayrollRun(id: string, action: "approve" | "pay" | "reopen"): Promise<{ ok: boolean; error?: string }> {
+  const r = await hrJson<{ ok: true }>(`/api/hr/payroll/runs/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+  return { ok: r.ok, error: r.error };
+}
+
+const PAYROLL_RULES = "hr_payroll_rules";
+export async function fetchPayrollRules(): Promise<import("@/lib/server/payroll-run").PayrollRule[]> {
+  const { data, error } = await supabase.from(PAYROLL_RULES).select("*").order("sort_order");
+  if (error) { console.error("[Payroll] Rules:", error.message); return []; }
+  return (data as import("@/lib/server/payroll-run").PayrollRule[]) || [];
+}
+export type PayrollRuleInput = Omit<import("@/lib/server/payroll-run").PayrollRule, "id">;
+export async function savePayrollRule(id: string | null, input: PayrollRuleInput): Promise<boolean> {
+  const q = id ? supabase.from(PAYROLL_RULES).update(input).eq("id", id) : supabase.from(PAYROLL_RULES).insert(input);
+  const { error } = await q;
+  if (error) { console.error("[Payroll] Save rule:", error.message); return false; }
+  return true;
+}
+export async function deletePayrollRule(id: string): Promise<boolean> {
+  const { error } = await supabase.from(PAYROLL_RULES).delete().eq("id", id);
+  if (error) { console.error("[Payroll] Delete rule:", error.message); return false; }
+  return true;
+}
+
+/* ── Phase C — the attendance engine ─────────────────────────────────── */
+
+export type { AttendanceSheet, SheetDay, SheetStatus } from "@/lib/server/attendance-sheet";
+
+/** One employee's month, every day accounted for (server-derived). */
+export async function fetchAttendanceSheet(employeeId: string, month: string): Promise<import("@/lib/server/attendance-sheet").AttendanceSheet | null> {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const res = await fetch(`/api/hr/attendance/sheet?employee_id=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(month)}&tz=${encodeURIComponent(tz)}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { sheet: import("@/lib/server/attendance-sheet").AttendanceSheet };
+    return j.sheet;
+  } catch (err) {
+    console.error("[Attendance] Sheet:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export interface AttendanceImportResult {
+  ok: boolean; error?: string; imported?: number; rows?: number; dryRun?: boolean;
+  problems?: Array<{ line: number; problem: string }>;
+  sample?: Array<{ employee_id: string; date: string; clock_in: string | null; clock_out: string | null; total_hours: number | null; status: string }>;
+}
+/* ── Attendance Phase 1 (owner-approved 23 Sep 2026) ─────────────────────
+   Corrections, the overtime queue and per-employee punch settings. Server
+   routes only — the day's times change through ONE writer on the server
+   (attendance-records.ts) so every change leaves an audit row. */
+
+export interface AttendanceCorrectionRow {
+  id: string; employee_id: string; employee_name: string; date: string; kind: "request" | "edit";
+  status: "pending" | "approved" | "rejected" | "applied";
+  clock_in: string | null; clock_out: string | null; break_minutes: number | null; reason: string;
+  decision_note: string | null; created_at: string; decided_at: string | null;
+  current: { clock_in: string | null; clock_out: string | null; break_minutes: number | null } | null;
+  /** The employee's policy zone — every time on this row is shown in it. */
+  timezone: string;
+}
+export interface OvertimeItem {
+  record_id: string; employee_id: string; employee_name: string; date: string;
+  clock_in: string | null; clock_out: string | null; minutes: number; work_end: string; timezone: string;
+}
+export interface AttendanceEmployeeSetting {
+  id: string; name: string; punch_method: "app" | "device"; works_remote: boolean; work_country: string | null; hire_date: string | null;
+}
+
+/** HR sets a day's times. clock_out "" clears it. Times are wall-clock in
+ *  the employee's policy zone; a reason is required. */
+export async function editAttendanceDay(input: {
+  employee_id: string; date: string; clock_in: string; clock_out: string; break_minutes: number; reason: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const r = await hrJson<{ record: unknown }>("/api/hr/attendance/record", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  return r.ok ? { ok: true } : { ok: false, error: r.error ?? `HTTP ${r.status}` };
+}
+
+export async function fetchAttendanceCorrections(): Promise<{ pending: AttendanceCorrectionRow[]; recent: AttendanceCorrectionRow[] }> {
+  const r = await hrJson<{ pending: AttendanceCorrectionRow[]; recent: AttendanceCorrectionRow[] }>("/api/hr/attendance/corrections");
+  return { pending: r.data?.pending ?? [], recent: r.data?.recent ?? [] };
+}
+
+export async function decideAttendanceCorrection(id: string, decision: "approve" | "reject", note: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const r = await hrJson<{ ok: true }>(`/api/hr/attendance/corrections/${id}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, note }),
+  });
+  return r.ok ? { ok: true } : { ok: false, error: r.error ?? `HTTP ${r.status}` };
+}
+
+export async function fetchPendingOvertime(): Promise<OvertimeItem[]> {
+  const r = await hrJson<{ items: OvertimeItem[] }>("/api/hr/attendance/overtime");
+  return r.data?.items ?? [];
+}
+
+export async function decideOvertime(decisions: Array<{ record_id: string; decision: "approve" | "reject"; minutes?: number }>): Promise<boolean> {
+  const r = await hrJson<{ ok: true }>("/api/hr/attendance/overtime", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decisions }),
+  });
+  return r.ok;
+}
+
+export async function fetchAttendanceEmployees(): Promise<AttendanceEmployeeSetting[]> {
+  const r = await hrJson<{ employees: AttendanceEmployeeSetting[] }>("/api/hr/attendance/employees");
+  return r.data?.employees ?? [];
+}
+
+export async function saveAttendanceEmployee(patch: { employee_id: string; punch_method?: "app" | "device"; works_remote?: boolean; work_country?: string | null }): Promise<boolean> {
+  const r = await hrJson<{ employee: unknown }>("/api/hr/attendance/employees", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+  });
+  return r.ok;
+}
+
+/** A fingerprint-device CSV export → attendance records (see the route). */
+export async function importAttendanceCsv(csv: string, dryRun: boolean): Promise<AttendanceImportResult> {
+  try {
+    const res = await fetch("/api/hr/attendance/import", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv, dryRun }),
+    });
+    const j = (await res.json().catch(() => null)) as Omit<AttendanceImportResult, "ok"> | null;
+    if (!res.ok) return { ok: false, error: j?.error ?? `HTTP ${res.status}`, ...(j ?? {}) };
+    return { ok: true, ...(j ?? {}) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "network" };
+  }
+}
+
+export async function fetchAttendancePolicies(): Promise<AttendancePolicyRow[]> {
+  const { data, error } = await supabase.from(ATTENDANCE_POLICIES).select("*").order("is_default", { ascending: false });
+  if (error) { console.error("[Attendance] Policies:", error.message); return []; }
+  return (data as AttendancePolicyRow[]) || [];
+}
+
+export type AttendancePolicyInput = Pick<AttendancePolicyRow, "name" | "country" | "timezone" | "work_start" | "work_end" | "late_threshold_min" | "min_hours" | "weekend_days" | "is_default" | "tracking_from">;
+/** Create or update a policy. One per country; `is_default` marks the one
+ *  everyone unmatched falls back to. */
+export async function saveAttendancePolicy(id: string | null, input: AttendancePolicyInput): Promise<boolean> {
+  const q = id
+    ? supabase.from(ATTENDANCE_POLICIES).update(input).eq("id", id)
+    : supabase.from(ATTENDANCE_POLICIES).insert(input);
+  const { error } = await q;
+  if (error) { console.error("[Attendance] Save policy:", error.message); return false; }
+  return true;
 }
 
 /** Clock in: create an attendance record with clock_in timestamp. */
@@ -804,10 +971,10 @@ export async function fetchJobPostings(
     : { data: [] };
 
   const deptMap = new Map<string, string>(
-    (depts || []).map((d: any) => [d.id, d.name as string]),
+    ((depts || []) as { id: string; name: string }[]).map((d) => [d.id, d.name]),
   );
   const posMap = new Map<string, string>(
-    (positions || []).map((p: any) => [p.id, p.title as string]),
+    ((positions || []) as { id: string; title: string }[]).map((p) => [p.id, p.title]),
   );
 
   return postings.map((p) => ({
@@ -885,7 +1052,7 @@ export async function fetchApplicants(
     .in("id", jobIds);
 
   const jobMap = new Map<string, string>(
-    (jobs || []).map((j: any) => [j.id, j.title as string]),
+    ((jobs || []) as { id: string; title: string }[]).map((j) => [j.id, j.title]),
   );
 
   return applicants.map((a) => ({
@@ -1185,7 +1352,7 @@ export async function fetchChecklistInstances(
     .in("id", clIds);
 
   const clMap = new Map<string, string>(
-    (checklists || []).map((c: any) => [c.id, c.name as string]),
+    ((checklists || []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
   );
 
   return instances.map((i) => ({
@@ -1214,7 +1381,7 @@ export async function assignChecklist(
   }
 
   const items = (template as ChecklistRow).items || [];
-  const itemsStatus = items.map((_: any, idx: number) => ({
+  const itemsStatus = items.map((_, idx) => ({
     item_index: idx,
     completed: false,
   }));
@@ -1565,7 +1732,7 @@ export async function fetchTrainingRecords(
     .in("id", courseIds);
 
   const courseMap = new Map<string, string>(
-    (courses || []).map((c: any) => [c.id, c.name as string]),
+    ((courses || []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
   );
 
   return records.map((r) => ({

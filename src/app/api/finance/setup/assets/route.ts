@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { postOpeningBalance } from "@/lib/accounting/posting";
 
 const ALLOWED_METHODS = ["straight_line", "declining_balance", "none"] as const;
 type Method = (typeof ALLOWED_METHODS)[number];
@@ -74,5 +75,25 @@ export async function POST(req: Request) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ asset: data });
+
+  /* The register is the onboarding book of assets: each one is capitalised
+     at once (Dr 1500 / Cr Owner Capital) so the balance sheet carries it
+     and the monthly depreciation run has a cost to work from. An asset
+     bought later through a bill is booked by that bill; this path is the
+     day-zero snapshot, like every other opening balance. */
+  let posting: { ok: boolean; error?: string; journal_no?: string } = { ok: true };
+  if (value > 0) {
+    const r = await postOpeningBalance(
+      { tenantId: auth.tenant_id, postedByAccountId: auth.account_id },
+      {
+        accountCode: "1500", amount: value,
+        currency: (body.currency?.trim().toUpperCase() || baseCurrency),
+        entryDate: body.purchase_date || undefined,
+        description: `Asset — ${body.name.trim()}`,
+        openingId: (data as { id: string }).id,
+      },
+    );
+    posting = r.ok ? { ok: true, journal_no: r.journal_no } : { ok: false, error: r.error };
+  }
+  return NextResponse.json({ asset: data, posting }, { status: posting.ok ? 200 : 207 });
 }

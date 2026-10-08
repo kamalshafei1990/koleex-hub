@@ -29,12 +29,14 @@
 import { useEffect } from "react";
 import { useCurrentAccount } from "@/lib/identity";
 import { withDefaults } from "@/lib/access-control";
+import { syncOrbStyleFromAccount } from "@/components/ai-orb/orb-style";
+import { syncMochiSoundFromAccount } from "@/components/ai-orb/orb-sound";
+import { syncHomeLayoutFromAccount } from "@/lib/home/home-layout";
 import type {
   DisplayPrefs,
   TextSizePref,
   DateFormatPref,
   TimeFormatPref,
-  NumberFormatPref,
 } from "@/lib/access-control";
 
 const CACHE_KEY = "koleex-display";
@@ -203,6 +205,13 @@ export function DisplayPreferencesApplier() {
      apply + refresh the cache. */
   useEffect(() => {
     if (!account) return;
+    /* The orb style rides the same account refresh. It carries its own
+       local-write guard (orb-style.ts), so it goes before the display one:
+       a display save in the last few seconds must not stop the orb from
+       following a choice made on another device. */
+    syncOrbStyleFromAccount(account.preferences?.orb);
+    syncMochiSoundFromAccount(account.preferences?.orb_sound);
+    syncHomeLayoutFromAccount(account.preferences?.home_layout);
     /* A just-made local choice outranks a possibly-stale server snapshot. */
     if (Date.now() < localWriteUntil) return;
     const d = withDefaults(account.preferences).display;
@@ -238,31 +247,5 @@ export function formatTimePref(date: Date, fmt: TimeFormatPref): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-const NUMBER_LOCALE: Record<NumberFormatPref, string> = {
-  comma_dot: "en-US",   // 1,234.50
-  dot_comma: "de-DE",   // 1.234,50
-  space_comma: "fr-FR", // 1 234,50
-};
 
-export function formatNumberPref(
-  n: number,
-  fmt: NumberFormatPref,
-  opts: Intl.NumberFormatOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-): string {
-  try {
-    return new Intl.NumberFormat(NUMBER_LOCALE[fmt], opts).format(n);
-  } catch {
-    return String(n);
-  }
-}
 
-/** A one-line "this is how things will look" sample for the settings UI. */
-export function displayPreviewSamples(d: DisplayPrefs, now: Date): {
-  date: string; time: string; number: string;
-} {
-  return {
-    date: formatDatePref(now, d.date_format),
-    time: formatTimePref(now, d.time_format),
-    number: formatNumberPref(1234.5, d.number_format),
-  };
-}

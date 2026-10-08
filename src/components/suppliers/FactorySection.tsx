@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_FS } from "@/lib/translations/contacts/fs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { FACTORY_TYPE_LABELS, factoryTypeLabel } from "@/lib/suppliers/intelligence";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
@@ -76,15 +76,6 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const inputCls =
   "w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
-const CAPABILITIES: { key: string; label: string; src: "factory" | "contact"; col: string }[] = [
-  { key: "oem", label: "OEM", src: "contact", col: "supports_oem_branding" },
-  { key: "odm", label: "ODM", src: "factory", col: "odm_supported" },
-  { key: "private_label", label: "Private label", src: "factory", col: "private_label_supported" },
-  { key: "low_moq", label: "Low MOQ", src: "factory", col: "low_moq_supported" },
-  { key: "packaging", label: "Custom packaging", src: "contact", col: "supports_packaging_customization" },
-  { key: "samples", label: "Samples", src: "factory", col: "supports_samples_contact" }, // resolved below
-];
-
 export default function FactorySection({
   supplierId,
   supplier,
@@ -96,11 +87,11 @@ export default function FactorySection({
   factory: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_FS);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const f = factory ?? {};
+  const f = useMemo(() => factory ?? {}, [factory]);
 
   const hasData = useMemo(
     () =>

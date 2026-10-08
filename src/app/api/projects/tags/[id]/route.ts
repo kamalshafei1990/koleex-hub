@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -23,7 +23,10 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .eq("tenant_id", auth.tenant_id)
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/projects/tags]", error.message);
+    return NextResponse.json({ error: error.code === "23505" ? "A tag with this name already exists" : "Tag request failed" }, { status: error.code === "23505" ? 409 : 500 });
+  }
   return NextResponse.json({ tag: data });
 }
 
@@ -38,6 +41,9 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
     .delete()
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/projects/tags]", error.message);
+    return NextResponse.json({ error: error.code === "23505" ? "A tag with this name already exists" : "Tag request failed" }, { status: error.code === "23505" ? 409 : 500 });
+  }
   return NextResponse.json({ ok: true });
 }

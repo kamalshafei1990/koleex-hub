@@ -55,6 +55,10 @@ export async function GET(req: Request) {
   if (!key) return NextResponse.json({ disabled: true, tips: [], geocode: null });
 
   const url = new URL(req.url);
+  /* ?probe=1 — "is address search available?" without an upstream call. The
+     forms asked with a real search for 北京 on every open (speed audit,
+     29/09/2026). */
+  if (url.searchParams.get("probe") === "1") return NextResponse.json({ disabled: false, tips: [], geocode: null });
   const q = (url.searchParams.get("q") ?? "").trim();
   const address = (url.searchParams.get("address") ?? "").trim();
 

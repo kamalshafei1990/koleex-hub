@@ -17,14 +17,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import {
   InventoryEmpty,
   Panel,
   StatusBadge,
 } from "@/components/inventory/InventoryUi";
 import ShipDialog from "@/components/sales/ShipDialog";
+import NewSalesOrderDialog from "@/components/sales/NewSalesOrderDialog";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface SoRow {
@@ -88,6 +91,10 @@ export default function SalesOrders() {
   const [dateRange, setDateRange] = useState<DateRangeKey>("90d");
 
   const [shipSoId, setShipSoId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const router = useRouter();
+  /* ?new=1 (Smart Create, Data Entry hub) opens the new-order form. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
 
   /* Debounce search. */
   const debounceRef = useRef<number | null>(null);
@@ -139,12 +146,9 @@ export default function SalesOrders() {
         {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/"
-              aria-label="Back to Hub"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              <RrIcon name="arrow-left" size={16} />
+            <Link href="/" aria-label="Back to Hub" className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
             </Link>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
               <RrIcon name="file-invoice" size={16} />
@@ -157,6 +161,13 @@ export default function SalesOrders() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
+            >
+              <RrIcon name="plus" size={12} /> New order
+            </button>
             <Link
               href="/sales"
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
@@ -307,6 +318,12 @@ export default function SalesOrders() {
           </table>
         </Panel>
       </div>
+
+      <NewSalesOrderDialog
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onCreated={(o) => router.push(`/sales/orders/${o.id}`)}
+      />
 
       {shipSoId && (
         <ShipDialog

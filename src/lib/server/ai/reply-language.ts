@@ -23,6 +23,7 @@ import "server-only";
    place ai_memory lives.
    --------------------------------------------------------------------------- */
 
+import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
 import { supabaseServer } from "../supabase-server";
 
 export type ReplyLang = "en" | "zh" | "ar";
@@ -145,21 +146,25 @@ export async function getReplyLanguage(accountId: string): Promise<ReplyLang | n
   return v === "en" || v === "zh" || v === "ar" ? v : null;
 }
 
-/** Persist (or clear) the preference. Read-modify-write on the JSONB column,
- *  the same pattern the AI memory tool uses, so sibling keys survive. */
+/** Persist (or clear) the preference.
+ *
+ *  PHASE 7 / finding N12. This used to read-modify-write the whole JSONB
+ *  column, and it is the WORST of the three writers that did: the agent route
+ *  calls it as `void setReplyLanguage(...)`, un-awaited, so it runs
+ *  concurrently with the entire turn — including any remember_about_user the
+ *  same turn invokes. One message was enough to lose a write:
+ *
+ *      "reply to me in Arabic, and remember my birthday is 3 May"
+ *
+ *  Both read the same document, and whichever wrote second erased the other.
+ *  It presented as "the assistant went back to English".
+ *
+ *  A `null` value in the patch deletes the key, which is what clearing means. */
 export async function setReplyLanguage(
   accountId: string,
   lang: ReplyLang | null,
 ): Promise<void> {
-  const { data } = await supabaseServer
-    .from("accounts")
-    .select("preferences")
-    .eq("id", accountId)
-    .maybeSingle();
-  const prefs = { ...((data?.preferences ?? {}) as Record<string, unknown>) };
-  if (lang) prefs.ai_reply_language = lang;
-  else delete prefs.ai_reply_language;
-  await supabaseServer.from("accounts").update({ preferences: prefs }).eq("id", accountId);
+  await mergeAccountPrefs(accountId, { ai_reply_language: lang });
 }
 
 const LABEL: Record<ReplyLang, string> = {

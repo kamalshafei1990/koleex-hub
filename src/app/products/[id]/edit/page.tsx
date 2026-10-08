@@ -1,11 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useParams } from "next/navigation";
-import ProductForm from "@/components/admin/ProductFormLazy";
-
-export default function EditProductPage() {
-  const params = useParams();
-  const id = params.id as string;
-
-  return <ProductForm productId={id} />;
+/* See /products/new — editing lives in Product Data, behind its gate. */
+export default async function EditProductRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/product-data/${encodeURIComponent(id)}/edit`);
 }

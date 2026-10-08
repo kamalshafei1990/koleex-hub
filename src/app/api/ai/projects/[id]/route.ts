@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { dbError } from "@/lib/server/ai/http/api-error";
 import {
   normalizeProjectColor,
   normalizeProjectIcon,
@@ -23,7 +24,7 @@ const COLUMNS = "id, name, icon, color, sort_order, created_at, updated_at";
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -55,13 +56,13 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .eq("account_id", auth.account_id)
     .select(COLUMNS)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("projects/id", error);
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ project: data });
 }
 
-export async function DELETE(_req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+export async function DELETE(req: Request, { params }: RouteCtx) {
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -75,6 +76,6 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .eq("account_id", auth.account_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("projects/id", error);
   return NextResponse.json({ ok: true });
 }

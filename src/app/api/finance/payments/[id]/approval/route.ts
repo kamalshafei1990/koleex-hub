@@ -23,6 +23,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { isAutoApprovable } from "@/lib/finance/payment-thresholds";
 import type { ApprovalStatus, FinancePayment } from "@/lib/finance/types";
+import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
 
 type Action =
   | "submit"
@@ -167,6 +168,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (error) {
     console.error("[payment approval POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  /* The ledger follows the approval. A payment reaches the books once it
+     is both approved and completed; when it is approved first, the status
+     route drafts it on completion instead. */
+  const approvedNow = next === "approved" || next === "partially_approved";
+  if (approvedNow && payment.status === "completed") {
+    await ledgerDraft("payment", id, auth.tenant_id, auth.account_id);
+  } else if (body.action === "reset" && (current === "approved" || current === "partially_approved")) {
+    await ledgerVoid("payment", id, auth.tenant_id, auth.account_id, "Payment approval reset");
   }
   return NextResponse.json({ payment: data as FinancePayment, auto_approved: wantsSubmit && next === "approved" });
 }

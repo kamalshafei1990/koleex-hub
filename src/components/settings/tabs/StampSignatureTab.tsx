@@ -5,16 +5,18 @@
    Reuses GET/POST/DELETE /api/quotations/saved-assets (super-admin writes). */
 
 import { useEffect, useRef, useState } from "react";
-import type { AccountWithLinks } from "@/types/supabase";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useConfirm } from "@/components/kds/useConfirm";
+import { BodyPortal } from "./ui";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 
 type Kind = "stamp" | "signature";
 interface Assets { stampUrl: string | null; signatureUrl: string | null }
 
-export default function StampSignatureTab(_props: { account: AccountWithLinks }) {
+export default function StampSignatureTab() {
   const [assets, setAssets] = useState<Assets>({ stampUrl: null, signatureUrl: null });
   const { t } = useTranslation(settingsT);
   const [loading, setLoading] = useState(true);
@@ -23,8 +25,10 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
 
   const load = async () => {
     try {
-      const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
-      if (res.ok) setAssets((await res.json()) as Assets);
+      /* Shared tenant fetch (lib/tenant-assets) — one request per session;
+         writers invalidate below so post-upload/removal reloads stay fresh. */
+      const json = await fetchSavedAssets();
+      if (json) setAssets(json);
     } finally {
       setLoading(false);
     }
@@ -51,9 +55,16 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
         return;
       }
       setMsg({ kind: "ok", text: kind === "stamp" ? t("assets.stampUpdated") : t("assets.sigUpdated") });
+      invalidateSavedAssets();
       await load();
     } finally { setBusy(null); }
   }
+
+  /* The tenant's seal and signature print on every quotation and invoice —
+     removing one asks first. */
+  const { askConfirm, confirmDialog } = useConfirm();
+  const askRemove = (kind: Kind) =>
+    askConfirm(t("assets.removeConfirm"), () => remove(kind), { confirmLabel: t("assets.remove"), cancelLabel: t("confirm.cancel") });
 
   async function remove(kind: Kind) {
     setBusy(kind); setMsg(null);
@@ -66,6 +77,7 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
       });
       if (!res.ok) { setMsg({ kind: "err", text: t("assets.removeFailed").replace("{code}", String(res.status)) }); return; }
       setMsg({ kind: "ok", text: t("assets.removed") });
+      invalidateSavedAssets();
       await load();
     } finally { setBusy(null); }
   }
@@ -83,8 +95,9 @@ export default function StampSignatureTab(_props: { account: AccountWithLinks })
       <p className="text-[12px] text-[var(--text-dim)] px-1">
         {t("assets.intro")}
       </p>
-      <Slot kind="stamp" label={t("assets.stamp")} hint={t("assets.stamp.hint")} square url={assets.stampUrl} busy={busy === "stamp"} onUpload={upload} onRemove={remove} />
-      <Slot kind="signature" label={t("assets.signature")} hint={t("assets.signature.hint")} url={assets.signatureUrl} busy={busy === "signature"} onUpload={upload} onRemove={remove} />
+      <Slot kind="stamp" label={t("assets.stamp")} hint={t("assets.stamp.hint")} square url={assets.stampUrl} busy={busy === "stamp"} onUpload={upload} onRemove={askRemove} />
+      <Slot kind="signature" label={t("assets.signature")} hint={t("assets.signature.hint")} url={assets.signatureUrl} busy={busy === "signature"} onUpload={upload} onRemove={askRemove} />
+      <BodyPortal>{confirmDialog}</BodyPortal>
 
       {msg && (
         <p className={`text-[12px] px-1 ${msg.kind === "ok" ? "text-[#00CC66]" : "text-[#FF3333]"}`}>{msg.text}</p>

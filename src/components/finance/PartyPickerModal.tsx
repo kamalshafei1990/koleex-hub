@@ -25,7 +25,7 @@ import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import type { FinancePartyRow } from "@/app/api/finance/parties/route";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PARTY } from "@/lib/translations/finance/party";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export type { FinancePartyRow };
@@ -48,7 +48,7 @@ export default function PartyPickerModal({
   onClose: () => void;
   onPick: (row: FinancePartyRow) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_PARTY);
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<FinancePartyRow[]>([]);
   const [loading, setLoading] = useState(false);

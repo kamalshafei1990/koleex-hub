@@ -386,6 +386,37 @@ export async function fetchContactsByType(
   }
 }
 
+/* ── The directory, in pages ──────────────────────────────────────────────
+   ONE page of the SAME rows fetchContacts/fetchContactsByType return, so the
+   caller can paint the first slice and stream the rest in behind it. The whole
+   directory in a single response was 77 KB on the wire and 4.1s on the owner's
+   link, and it starved every other request on the screen while it downloaded.
+
+   `type` null = every contact type (the Contacts app itself). Errors resolve to
+   an empty page rather than throwing: a failed page must leave the rows already
+   on screen alone, exactly as the full fetch does. */
+export async function fetchContactsPage(
+  type: string | null,
+  page: number,
+  pageSize = 100,
+  opts?: { fresh?: boolean },
+): Promise<{ rows: ContactRow[]; total: number | null; hasMore: boolean }> {
+  const p = new URLSearchParams({ paged: "1", wide: "1", page: String(page), pageSize: String(pageSize) });
+  if (type) p.set("type", type);
+  try {
+    const res = await fetch(`/api/contacts?${p.toString()}`, {
+      credentials: "include",
+      ...(opts?.fresh ? { cache: "no-store" as RequestCache } : {}),
+    });
+    if (!res.ok) return { rows: [], total: null, hasMore: false };
+    const json = (await res.json()) as { contacts?: ContactRow[]; total?: number | null; hasMore?: boolean };
+    return { rows: json.contacts ?? [], total: json.total ?? null, hasMore: Boolean(json.hasMore) };
+  } catch (e) {
+    if (!opts?.fresh) console.warn("[Contacts] page fetch failed:", e instanceof Error ? e.message : e);
+    return { rows: [], total: null, hasMore: false };
+  }
+}
+
 export async function createContact(obj: Record<string, unknown>): Promise<{ data: ContactRow | null; error: string | null }> {
   try {
     const res = await fetch("/api/contacts", {

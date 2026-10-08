@@ -124,9 +124,15 @@ export default function KoleexOrb({
     }
     if (greetKey !== greetSeen.current) {
       greetSeen.current = greetKey;
-      setJumping(true);
-      const t = setTimeout(() => setJumping(false), 950);
-      return () => clearTimeout(t);
+      let alive = true;
+      let t: ReturnType<typeof setTimeout> | undefined;
+      /* microtask: same frame, but no synchronous setState in the effect body */
+      queueMicrotask(() => {
+        if (!alive) return;
+        setJumping(true);
+        t = setTimeout(() => setJumping(false), 950);
+      });
+      return () => { alive = false; if (t) clearTimeout(t); };
     }
   }, [greetKey]);
 
@@ -135,8 +141,9 @@ export default function KoleexOrb({
   const [dynExpr, setDynExpr] = useState<Expr | null>(null);
   useEffect(() => {
     if (!animated) {
-      setDynExpr(null);
-      return;
+      let keep = true;
+      queueMicrotask(() => { if (keep) setDynExpr(null); });
+      return () => { keep = false; };
     }
     let alive = true;
     let t: ReturnType<typeof setTimeout>;
@@ -149,7 +156,7 @@ export default function KoleexOrb({
         setDynExpr(toggle ? "look-left" : "look-right");
         t = setTimeout(loop, 1000);
       };
-      setDynExpr("look-left");
+      queueMicrotask(() => { if (alive) setDynExpr("look-left"); });
       t = setTimeout(loop, 1000);
       return () => {
         alive = false;
@@ -207,7 +214,7 @@ export default function KoleexOrb({
       };
     }
 
-    setDynExpr(null);
+    queueMicrotask(() => { if (alive) setDynExpr(null); });
     return () => {
       alive = false;
     };

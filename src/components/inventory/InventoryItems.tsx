@@ -32,6 +32,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 /* INV-H5C — taxonomy hints for internal-use items. */
 import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
 /* INV-H9 — card-based internal-item picker (replaces dropdown flow). */
@@ -121,9 +122,17 @@ function readItemsSnap(): ItemsSnap | null {
 
 export default function InventoryItems() {
   const { t } = useTranslation(inventoryT);
+  const router = useRouter();
+  /* ?filter=low_stock — the dashboard's and the alert's link: only the items
+     low in some warehouse (lib/inventory/low-stock). Read from the router's
+     params, never window.location (on a client navigation that is still the
+     page we came from). */
+  const lowStock = useSearchParams().get("filter") === "low_stock";
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  /* Seeded synchronously from the mirror — first paint shows the real list. */
-  const snap0 = useRef<ItemsSnap | null>(readItemsSnap());
+  /* Seeded synchronously from the mirror — first paint shows the real list.
+     Never for the low-stock view: the whole catalogue would paint, then
+     shrink to the few low items. */
+  const snap0 = useRef<ItemsSnap | null>(lowStock ? null : readItemsSnap());
   const [rows, setRows] = useState<ItemRow[]>(() => snap0.current?.rows ?? []);
   const [types, setTypes] = useState<ItemType[]>(() => snap0.current?.types ?? []);
   const [warehouses, setWarehouses] = useState<Warehouse[]>(() => snap0.current?.warehouses ?? []);
@@ -145,6 +154,9 @@ export default function InventoryItems() {
   const [error, setError] = useState<string | null>(null);
 
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  /* The list answers whether this role may see (and so set) item costs —
+     its «private records» switch (src/lib/experience). */
+  const [canSeeCost, setCanSeeCost] = useState(true);
   /* INV-H9 — card-based internal-item drawer. */
   const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
   const [typesPanelOpen, setTypesPanelOpen] = useState(false);
@@ -170,6 +182,7 @@ export default function InventoryItems() {
       if (searchKey) qs.set("q", searchKey);
       if (filterTypeId) qs.set("type_id", filterTypeId);
       if (filterStatus) qs.set("status", filterStatus);
+      if (lowStock) qs.set("filter", "low_stock");
       const [iRes, tRes, wRes] = await Promise.all([
         fetch(`/api/inventory/items?${qs.toString()}`, { credentials: "include", cache: "no-store" }),
         fetch(`/api/inventory/item-types`, { credentials: "include", cache: "no-store" }),
@@ -186,8 +199,9 @@ export default function InventoryItems() {
       setRows(nextRows);
       setTypes(nextTypes);
       setWarehouses(nextWh);
+      setCanSeeCost(iJ.can_see_cost_data !== false);
       /* Mirror the DEFAULT view only — see the note on the key. */
-      if (!searchKey && !filterTypeId && filterStatus === "active") {
+      if (!searchKey && !filterTypeId && filterStatus === "active" && !lowStock) {
         try {
           window.localStorage.setItem(INV_ITEMS_SNAP_KEY, JSON.stringify({
             rows: nextRows.slice(0, 300), types: nextTypes, warehouses: nextWh,
@@ -199,7 +213,7 @@ export default function InventoryItems() {
     } finally {
       setLoading(false);
     }
-  }, [searchKey, filterTypeId, filterStatus]);
+  }, [searchKey, filterTypeId, filterStatus, lowStock]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -302,6 +316,15 @@ export default function InventoryItems() {
             >
               {t("inv.common.filters", "Filters")} {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
             </button>
+            {lowStock && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 py-1 ps-2.5 pe-1 text-[11.5px] text-amber-500">
+                {t("inv.alert.low_stock", "Low stock items")}
+                <button type="button" onClick={() => router.replace("/inventory/items")} aria-label={`${t("inv.alert.low_stock", "Low stock items")} — ${t("inv.items.clear", "Clear")}`}
+                  className="grid h-5 w-5 place-items-center rounded-full hover:bg-amber-500/15">
+                  <RrIcon name="cross" size={9} />
+                </button>
+              </span>
+            )}
             {filterTypeId && (
               <button
                 onClick={() => setFilterTypeId("")}
@@ -368,9 +391,10 @@ export default function InventoryItems() {
                 <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
                     icon="box-open"
-                    title={searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
-                    hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
-                    action={
+                    /* The low-stock view (26 Sep 2026): nothing low is good news, not an empty catalogue. */
+                    title={lowStock ? t("inv.items.none_low", "Nothing is low in stock") : searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
+                    hint={lowStock ? t("inv.items.none_low_hint", "Every tracked item is above its reorder point (or its minimum, when it has no reorder point).") : searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
+                    action={lowStock ? undefined : (
                       <button
                         onClick={() => setInternalDrawerOpen(true)}
                         className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
@@ -378,7 +402,7 @@ export default function InventoryItems() {
                         <RrIcon name="briefcase" size={11} />
                         {t("inv.add_internal_use")}
                       </button>
-                    }
+                    )}
                   />
                 </td></tr>
               ) : (
@@ -438,6 +462,7 @@ export default function InventoryItems() {
         <QuickAddDrawer
           types={types}
           warehouses={warehouses}
+          canSeeCost={canSeeCost}
           onClose={() => setQuickAddOpen(false)}
           onSuccess={() => { setQuickAddOpen(false); void load(); }}
         />
@@ -494,10 +519,11 @@ function DrawerShell({
 }
 
 function QuickAddDrawer({
-  types, warehouses, onClose, onSuccess,
+  types, warehouses, canSeeCost, onClose, onSuccess,
 }: {
   types: ItemType[];
   warehouses: Warehouse[];
+  canSeeCost: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -520,6 +546,10 @@ function QuickAddDrawer({
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  /* Can't read → can't write: without the switch there is no cost field —
+     the server refuses one (code needs_private_data), and says so if the
+     list had not answered yet. */
+  const [costLocked, setCostLocked] = useState(!canSeeCost);
   const [currency, setCurrency] = useState("USD");
   const [reorderPoint, setReorderPoint] = useState("");
   const [minStock, setMinStock] = useState("");
@@ -579,7 +609,7 @@ function QuickAddDrawer({
         if (brand) payload.brand = brand;
         if (sku) payload.sku = sku;
         if (barcode) payload.barcode = barcode;
-        if (costPrice) payload.cost_price = Number(costPrice) || 0;
+        if (costPrice && !costLocked) payload.cost_price = Number(costPrice) || 0;
         if (currency) payload.currency = currency;
         if (reorderPoint) payload.reorder_point = Number(reorderPoint);
         if (minStock) payload.min_stock = Number(minStock);
@@ -593,7 +623,16 @@ function QuickAddDrawer({
         body: JSON.stringify(payload),
       });
       const j = await r.json();
-      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+      if (!r.ok) {
+        if (j.code === "needs_private_data") {
+          setCostLocked(true);
+          setCostPrice("");
+          setError(t("inv.items.costHidden", "Item costs are shown and set only with «Can see private data» in Roles & Permissions."));
+          return;
+        }
+        setError(humanizeError(j.error ?? `HTTP ${r.status}`));
+        return;
+      }
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -782,7 +821,7 @@ function QuickAddDrawer({
               <input placeholder="SKU"          value={sku}          onChange={(e) => setSku(e.target.value)}          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
               <input placeholder="Barcode"      value={barcode}      onChange={(e) => setBarcode(e.target.value)}      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
               <input placeholder="Currency"     value={currency}     onChange={(e) => setCurrency(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              {!costLocked && <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />}
               <input type="number" placeholder="Reorder point" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
               <input type="number" placeholder="Min stock"     value={minStock}     onChange={(e) => setMinStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
               <input type="number" placeholder="Max stock"     value={maxStock}     onChange={(e) => setMaxStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
@@ -826,6 +865,8 @@ interface DetailItem {
   linked_product_id: string | null;
   created_at: string;
   updated_at: string;
+  /** No «private records» switch: cost_price came as 0 and shows «•••». */
+  cost_hidden?: boolean;
 }
 interface DetailStockBucket {
   warehouse_id: string;
@@ -856,6 +897,9 @@ interface DetailValuation {
   last_in_cost: number | null;
   currency: string;
   locations: DetailValuationLocation[];
+  /** No «private records» switch on the role: the cost fields came as 0 and
+   *  show «•••»; the quantities are real (src/lib/experience). */
+  cost_hidden?: boolean;
 }
 
 function ItemDetailDrawer({
@@ -1022,18 +1066,18 @@ function ItemDetailDrawer({
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.avg_cost", "Avg cost")}</div>
-                  <div className="mt-0.5 text-[15px] tabular-nums font-mono">{fmtMoney(valuation.weighted_avg_cost)}</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono">{valuation.cost_hidden ? "•••" : fmtMoney(valuation.weighted_avg_cost)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.stock_value", "Stock value")}</div>
-                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{fmtMoney(valuation.total_value)}</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{valuation.cost_hidden ? "•••" : fmtMoney(valuation.total_value)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.last_in_cost", "Last in cost")}</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono text-[var(--text-muted)]">
-                    {valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
+                    {valuation.cost_hidden ? "•••" : valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
                   </div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
@@ -1054,8 +1098,8 @@ function ItemDetailDrawer({
                         <tr key={l.warehouse_id} className="border-b border-[var(--border-subtle)] last:border-b-0">
                           <td className="px-2 py-1.5 text-[var(--text-muted)]">{l.warehouse_code} <span className="text-[var(--text-dim)]">· {l.warehouse_name}</span></td>
                           <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtQty(l.qty_on_hand)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtMoney(l.average_cost)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtMoney(l.inventory_value)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{valuation.cost_hidden ? "•••" : fmtMoney(l.average_cost)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{valuation.cost_hidden ? "•••" : fmtMoney(l.inventory_value)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1076,7 +1120,7 @@ function ItemDetailDrawer({
               <DT label="Brand"       value={item.brand ?? "—"} />
               <DT label="SKU"         value={item.sku ?? "—"} />
               <DT label="Barcode"     value={item.barcode ?? "—"} />
-              <DT label="Cost"        value={item.cost_price != null ? `${Number(item.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.currency ?? ""}` : "—"} />
+              <DT label="Cost"        value={item.cost_hidden ? "•••" : item.cost_price != null ? `${Number(item.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.currency ?? ""}` : "—"} />
               <DT label="Reorder"     value={item.reorder_point != null ? fmtQty(item.reorder_point) : "—"} />
               <DT label="Min stock"   value={item.min_stock != null ? fmtQty(item.min_stock) : "—"} />
               <DT label="Max stock"   value={item.max_stock != null ? fmtQty(item.max_stock) : "—"} />
@@ -1272,6 +1316,8 @@ interface VariantDto {
   attributes: Record<string, unknown>;
   cost_price: number | null;
   status: "active" | "inactive" | "archived";
+  /** No «private records» switch: cost_price came as 0 and shows «•••». */
+  cost_hidden?: boolean;
 }
 
 function ItemVariantsSection({ itemId }: { itemId: string }) {
@@ -1455,7 +1501,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
                       .join(", ") || "—"}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">
-                    {v.cost_price != null
+                    {v.cost_hidden ? "•••" : v.cost_price != null
                       ? Number(v.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : "—"}
                   </td>

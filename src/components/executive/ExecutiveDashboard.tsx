@@ -235,13 +235,16 @@ export default function ExecutiveDashboard() {
       backHref="/"
       action={
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => openSmartCreate()}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
-                  title="Create (c)">
-            <RrIcon name="plus" size={12} /> Create
-          </button>
+          {/* Smart Create is desktop/tablet only (owner: not on phones). */}
+          <span className="hidden sm:contents">
+            <button type="button" onClick={() => openSmartCreate()}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+                    title="Create (c)">
+              <RrIcon name="plus" size={12} /> Create
+            </button>
+          </span>
           <FocusToggle />
-          <Link href="/finance/visual"
+          <Link href="/finance/statements"
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
             <RrIcon name="balance-scale-left" size={12} /> Statements
           </Link>

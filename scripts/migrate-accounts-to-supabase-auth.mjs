@@ -2,6 +2,12 @@
 /**
  * migrate-accounts-to-supabase-auth.mjs
  *
+ * RETIRED 26/09/2026 — DO NOT RUN. The app side this prepares for
+ * (NEXT_PUBLIC_USE_SUPABASE_AUTH, SupabaseGate, src/lib/auth-client.ts) was
+ * removed, and /login was deleted in 452344e8, so the "next steps" it prints
+ * lead nowhere. Running it would still rewrite accounts.id for nothing. Kept
+ * as a record of the plan (see supabase/SUPABASE_AUTH_SETUP.md).
+ *
  * One-shot migration that links every row in `public.accounts` to a
  * Supabase `auth.users` row with a matching id. After it runs:
  *

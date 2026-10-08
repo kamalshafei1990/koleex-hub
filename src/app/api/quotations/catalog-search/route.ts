@@ -27,6 +27,7 @@ interface ProductRow {
   product_name: string;
   status?: string;
   visible?: boolean;
+  division_slug?: string;
 }
 interface ModelRow {
   id: string;
@@ -47,6 +48,7 @@ interface MediaRow {
 
 interface PickerRow {
   product_id: string;
+  division_slug: string;
   model_id: string;
   model_name: string;
   sku: string;
@@ -81,10 +83,18 @@ export async function GET(req: Request) {
      for an SKU that lived past that slot returned nothing. The
      full catalog is small enough (one tenant's products) to load
      into memory in one pass, and we cap the OUTPUT after the
-     filter so the response payload stays bounded. */
+     filter so the response payload stays bounded.
+
+     TENANT SCOPE lives on `products` (models and media carry no
+     tenant_id of their own). The products query is the one that is
+     scoped, and every model / media row is then admitted only through
+     the resulting product-id set — a row whose product is not in this
+     tenant's map never reaches the response. Previously `products` was
+     read unscoped, so the picker listed every tenant's catalog. */
   const productsQuery = supabaseServer
     .from("products")
-    .select("id, product_name, status, visible");
+    .select("id, product_name, status, visible, division_slug")
+    .eq("tenant_id", auth.tenant_id);
   const modelsQuery = supabaseServer
     .from("product_models")
     .select(
@@ -96,36 +106,49 @@ export async function GET(req: Request) {
     .select("product_id, url, order")
     .order("order", { ascending: true });
 
-  const [productsRes, modelsRes, mediaRes] = await Promise.all([
+  const divisionsQuery = supabaseServer
+    .from("divisions")
+    .select("slug, name")
+    .eq("tenant_id", auth.tenant_id)
+    .order("order", { ascending: true });
+
+  const [productsRes, modelsRes, mediaRes, divisionsRes] = await Promise.all([
     productsQuery,
     modelsQuery,
     mediaQuery,
+    divisionsQuery,
   ]);
 
   if (productsRes.error || modelsRes.error || mediaRes.error) {
-    const msg =
-      productsRes.error?.message ||
-      modelsRes.error?.message ||
-      mediaRes.error?.message ||
-      "catalog fetch failed";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[api/quotations/catalog-search]",
+      productsRes.error?.message || modelsRes.error?.message || mediaRes.error?.message,
+    );
+    return NextResponse.json({ error: "Catalog fetch failed" }, { status: 500 });
   }
 
   const products = (productsRes.data ?? []) as ProductRow[];
   const productById = new Map(products.map((p) => [p.id, p]));
 
-  /* First image per product. media query is pre-sorted by `order` so
-     `set(...).get(...)` keeps the first one (we only insert if absent). */
+  /* First image per product — tenant products only. media query is
+     pre-sorted by `order` so `set(...).get(...)` keeps the first one
+     (we only insert if absent). */
   const firstImage = new Map<string, string>();
   for (const m of (mediaRes.data ?? []) as MediaRow[]) {
+    if (!productById.has(m.product_id)) continue;
     if (m.url && !firstImage.has(m.product_id)) {
       firstImage.set(m.product_id, m.url);
     }
   }
 
-  const needle = q.toLowerCase();
+  /* Multi-word AND search, matching the client's ranking semantics: every
+     word must appear somewhere in model + SKU + name. The old whole-string
+     includes() meant "ironing vacuum" found nothing while "vacuum ironing"
+     worked — word order ruled the result set. */
+  const needles = q.toLowerCase().split(/\s+/).filter(Boolean);
   const out: PickerRow[] = [];
   for (const m of (modelsRes.data ?? []) as ModelRow[]) {
+    /* Not in this tenant's product map → not this tenant's model. */
     const product = productById.get(m.product_id);
     if (!product) continue;
     /* Internal picker — drafts and not-yet-visible products MUST be
@@ -136,12 +159,12 @@ export async function GET(req: Request) {
     const modelName = m.model_name ?? m.sku ?? "";
     const productName = product.product_name ?? "";
 
-    if (needle) {
+    if (needles.length) {
       /* Match against model code + SKU + product name so a bounded server
          search (used by the picker's debounced query) finds a SKU even when
          model_name is present. Broadens matches only — never narrows. */
       const hay = `${modelName} ${m.sku ?? ""} ${productName}`.toLowerCase();
-      if (!hay.includes(needle)) continue;
+      if (!needles.every((w) => hay.includes(w))) continue;
     }
 
     /* Pick the most useful price for the picker. Prefer global_price
@@ -159,6 +182,7 @@ export async function GET(req: Request) {
 
     out.push({
       product_id: m.product_id,
+      division_slug: product.division_slug ?? "",
       model_id: m.id,
       model_name: modelName,
       sku: m.sku ?? "",
@@ -170,8 +194,13 @@ export async function GET(req: Request) {
     if (out.length >= limit) break;
   }
 
+  const divisionNames: Record<string, string> = {};
+  for (const d of (divisionsRes.data ?? []) as Array<{ slug: string; name: string }>) {
+    divisionNames[d.slug] = d.name;
+  }
+
   return NextResponse.json(
-    { rows: out },
+    { rows: out, divisions: divisionNames },
     {
       /* Catalog is read-heavy and changes infrequently. 60 s cache +
          stale-while-revalidate keeps the picker snappy when the user

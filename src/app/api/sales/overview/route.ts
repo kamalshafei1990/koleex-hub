@@ -171,6 +171,121 @@ export async function GET(req: Request) {
     case "payments":
       return payments(tenant);
 
+    case "dashboard": {
+      /* Aggregated KPIs + recent feed for the Sales dashboard. The browser
+         used to read six tables directly (crm_opportunities with a non-existent
+         `value` column, customers with non-existent `is_active`) — map to the
+         real columns and resolve customer names server-side. */
+      const [oppsR, quotesR, ordersR, invoicesR, custR, actR] = await Promise.all([
+        scoped(supabaseServer.from("crm_opportunities").select("id,name,expected_revenue,won_at,lost_at")),
+        scoped(supabaseServer.from("quotations").select("id,quote_no,status,total,created_at,customer_id")).order("created_at", { ascending: false }).limit(50),
+        scoped(supabaseServer.from("sales_orders").select("id,status")).order("created_at", { ascending: false }).limit(50),
+        scoped(supabaseServer.from("invoices").select("id,status,total,balance,issued_at,created_at,customer_id")).order("created_at", { ascending: false }).limit(50),
+        scoped(supabaseServer.from("customers").select("id,status")),
+        scoped(supabaseServer.from("crm_activities").select("id,title,due_at,done_at,created_at")).is("done_at", null).order("due_at", { ascending: true, nullsFirst: false }).limit(20),
+      ]);
+      if (oppsR.error) return fail("dashboard.opps", oppsR.error.message);
+      if (quotesR.error) return fail("dashboard.quotes", quotesR.error.message);
+      if (ordersR.error) return fail("dashboard.orders", ordersR.error.message);
+      if (invoicesR.error) return fail("dashboard.invoices", invoicesR.error.message);
+      if (custR.error) return fail("dashboard.customers", custR.error.message);
+      if (actR.error) return fail("dashboard.activities", actR.error.message);
+
+      const quotes = (quotesR.data ?? []) as Row[];
+      const invoices = (invoicesR.data ?? []) as Row[];
+      const names = await customerNames([
+        ...quotes.map((r) => String(r.customer_id ?? "")),
+        ...invoices.map((r) => String(r.customer_id ?? "")),
+      ]);
+
+      return NextResponse.json({
+        opps: ((oppsR.data ?? []) as Row[]).map((r) => ({
+          id: r.id, name: s(r.name), value: num(r.expected_revenue),
+          is_won: r.won_at != null, is_lost: r.lost_at != null, won_at: s(r.won_at),
+        })),
+        quotes: quotes.map((r) => ({
+          id: r.id, quote_no: s(r.quote_no), status: s(r.status),
+          customer_name: names.get(String(r.customer_id ?? "")) ?? null,
+          total: num(r.total), created_at: r.created_at,
+        })),
+        orders: ((ordersR.data ?? []) as Row[]).map((r) => ({ id: r.id, status: s(r.status) })),
+        invoices: invoices.map((r) => ({
+          id: r.id, status: s(r.status),
+          customer_name: names.get(String(r.customer_id ?? "")) ?? null,
+          total: num(r.total), balance: num(r.balance),
+          issued_at: s(r.issued_at), created_at: r.created_at,
+        })),
+        customers: ((custR.data ?? []) as Row[]).map((r) => ({
+          id: r.id,
+          is_active: !r.status || String(r.status).toLowerCase() !== "inactive",
+        })),
+        activities: ((actR.data ?? []) as Row[]).map((r) => ({
+          id: r.id, title: s(r.title), created_at: r.created_at, is_done: r.done_at != null,
+        })),
+      }, { headers: CACHE });
+    }
+
+    case "pipeline": {
+      const [stagesR, oppsR] = await Promise.all([
+        scoped(supabaseServer.from("crm_stages").select("id,name")).order("sequence", { ascending: true }),
+        scoped(supabaseServer.from("crm_opportunities").select("id,name,expected_revenue,stage_id,expected_close_date,won_at,lost_at")).is("lost_at", null),
+      ]);
+      if (stagesR.error) return fail("pipeline.stages", stagesR.error.message);
+      if (oppsR.error) return fail("pipeline.opps", oppsR.error.message);
+      return NextResponse.json({
+        stages: ((stagesR.data ?? []) as Row[]).map((r) => ({ id: r.id, name: s(r.name) })),
+        opps: ((oppsR.data ?? []) as Row[]).map((r) => ({
+          id: r.id, name: s(r.name), value: num(r.expected_revenue),
+          stage_id: s(r.stage_id), expected_close_date: s(r.expected_close_date),
+          is_won: r.won_at != null, is_lost: r.lost_at != null,
+        })),
+      }, { headers: CACHE });
+    }
+
+    case "customers": {
+      const [custR, invR] = await Promise.all([
+        scoped(supabaseServer.from("customers").select("id,name,company_name,country,customer_type,status")).order("name", { ascending: true }).limit(50),
+        scoped(supabaseServer.from("invoices").select("customer_id,total")),
+      ]);
+      if (custR.error) return fail("customers", custR.error.message);
+      if (invR.error) return fail("customers.invoices", invR.error.message);
+      const revenue: Record<string, number> = {};
+      for (const i of (invR.data ?? []) as Row[]) {
+        if (!i.customer_id) continue;
+        const cid = String(i.customer_id);
+        revenue[cid] = (revenue[cid] || 0) + (num(i.total) || 0);
+      }
+      return NextResponse.json({
+        customers: ((custR.data ?? []) as Row[]).map((r) => ({
+          id: r.id, name: s(r.name) ?? s(r.company_name) ?? "",
+          country: s(r.country), tier: s(r.customer_type),
+          is_active: !r.status || String(r.status).toLowerCase() !== "inactive",
+        })),
+        revenue,
+      }, { headers: CACHE });
+    }
+
+    case "reports": {
+      const [invR, oppsR, stagesR] = await Promise.all([
+        scoped(supabaseServer.from("invoices").select("total,issued_at,created_at")),
+        scoped(supabaseServer.from("crm_opportunities").select("expected_revenue,stage_id,won_at,lost_at")),
+        scoped(supabaseServer.from("crm_stages").select("id,name")).order("sequence", { ascending: true }),
+      ]);
+      if (invR.error) return fail("reports.invoices", invR.error.message);
+      if (oppsR.error) return fail("reports.opps", oppsR.error.message);
+      if (stagesR.error) return fail("reports.stages", stagesR.error.message);
+      return NextResponse.json({
+        invoices: ((invR.data ?? []) as Row[]).map((r) => ({
+          total: num(r.total), issued_at: s(r.issued_at), created_at: r.created_at,
+        })),
+        opps: ((oppsR.data ?? []) as Row[]).map((r) => ({
+          value: num(r.expected_revenue), stage_id: s(r.stage_id),
+          is_won: r.won_at != null, is_lost: r.lost_at != null,
+        })),
+        stages: ((stagesR.data ?? []) as Row[]).map((r) => ({ id: r.id, name: s(r.name) })),
+      }, { headers: CACHE });
+    }
+
     default:
       return NextResponse.json({ error: "Unknown module" }, { status: 400 });
   }

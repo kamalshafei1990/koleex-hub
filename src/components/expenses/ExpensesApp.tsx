@@ -363,7 +363,13 @@ export default function ExpensesApp() {
               ) : undefined}
             />
           ) : (
-            <ul key={tab} className="kx-tab-in grid gap-2">
+            /* [&>*]:min-w-0 — a grid track sizes to `min-width: auto`, so an
+               item can never shrink below its own content. One expense row
+               measured 459px inside a 343px column and stretched the page to
+               475: the whole app scrolled sideways at 375px, which is the
+               "dancing" the owner reported. The row's own truncation only
+               works once the track may be narrower than the text in it. */
+            <ul key={tab} className="kx-tab-in grid gap-2 [&>*]:min-w-0">
               {filtered.map((e) => (
                 <ExpenseRow
                   key={e.id}

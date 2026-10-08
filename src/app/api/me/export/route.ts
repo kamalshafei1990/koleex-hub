@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { getServerAuth } from "@/lib/server/auth";
 import { withDefaults } from "@/lib/access-control";
+import { readMemories } from "@/lib/server/ai/user-memory-store";
 
 export async function GET() {
   const auth = await getServerAuth();
@@ -41,9 +42,19 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const preferences = withDefaults(
-    (acct as { preferences?: unknown } | null)?.preferences as never,
-  );
+  const rawPrefs = ((acct as { preferences?: Record<string, unknown> | null } | null)?.preferences ?? {}) as Record<string, unknown>;
+  /* withDefaults returns the screens' keys only, so what the assistant
+     remembers about the person and their reply language were missing from
+     their own data export. Personal data — it goes in. Facts live in the
+     ai_memories table since 2026-10-07 (the JSON ai_memory is legacy;
+     still exported when present, since it is still their data). */
+  const memory = await readMemories(auth.account_id);
+  const preferences = {
+    ...withDefaults(rawPrefs as never),
+    ...(Object.keys(memory).length > 0 ? { ai_memory: memory } : {}),
+    ...(rawPrefs.ai_memory !== undefined ? { ai_memory_legacy: rawPrefs.ai_memory } : {}),
+    ...(rawPrefs.ai_reply_language !== undefined ? { ai_reply_language: rawPrefs.ai_reply_language } : {}),
+  };
 
   const payload = {
     exported_at: new Date().toISOString(),

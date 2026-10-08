@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import FormModal from "@/components/kds/FormModal";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import KdsEmptyState from "@/components/kds/EmptyState";
 import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
@@ -929,6 +930,16 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting, 
   );
 }
 
+/* A history row as it reads (26 Sep 2026): the change in the screen's
+   language, the day first (25/09/2026), and who made it when the row
+   knows. */
+const HISTORY_WORDS = ["assigned", "transferred", "removed"];
+const historyAction = (a: string, t: (key: string) => string) => (HISTORY_WORDS.includes(a) ? t(`mgmt.act.${a}`) : a);
+const historyDay = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
 /* ═══════════════════════════════════════════════════
    POSITION DETAIL (history + JD)
    ═══════════════════════════════════════════════════ */
@@ -988,9 +999,10 @@ function PositionDetailModal({ open, onClose, position, people, t }: {
                       <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--border-strong)]" />
                       <div className="text-[12px] font-medium text-[var(--text-primary)]">{ctc?.name || "Unknown"}</div>
                       <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-2">
-                        <span className={`capitalize ${h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"}`}>{h.action}</span>
+                        <span className={h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"}>{historyAction(h.action, t)}</span>
                         <span>·</span>
-                        <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                        <span className="tabular-nums">{historyDay(h.created_at)}</span>
+                        {h.changed_by_name && <><span>·</span><span>{t("mgmt.by")} {h.changed_by_name}</span></>}
                       </div>
                       {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                     </div>
@@ -1382,9 +1394,13 @@ function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: 
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
+        {/* Phone-only back out of the detail pane: the Hub's back chip, not a
+            text link — the same control as every app's "← Hub" (w-fit: the
+            chip is `flex`, and this sits in a block). Same at the three
+            department panes below. */}
         <button onClick={onClose}
-          className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-          <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+          aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+          <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
         </button>
         <div className="flex items-center gap-4">
           <Avatar src={person.avatar} name={person.name} size={56} />
@@ -1505,8 +1521,8 @@ function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: 
                   <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-primary)] ${
                     h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
                   }`} />
-                  <div className="text-[12px] font-medium text-[var(--text-primary)] capitalize">{h.action}</div>
-                  <div className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</div>
+                  <div className="text-[12px] font-medium text-[var(--text-primary)]">{historyAction(h.action, t)}</div>
+                  <div className="text-[11px] text-[var(--text-dim)] tabular-nums">{historyDay(h.created_at)}{h.changed_by_name ? ` · ${t("mgmt.by")} ${h.changed_by_name}` : ""}</div>
                   {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                 </div>
               ))}
@@ -1651,11 +1667,12 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
                     h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
                   }`} />
                   <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-semibold capitalize ${
+                    <span className={`text-[11px] font-semibold ${
                       h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"
-                    }`}>{h.action}</span>
+                    }`}>{historyAction(h.action, t)}</span>
                     <span className="text-[11px] text-[var(--text-dim)]">·</span>
-                    <span className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</span>
+                    <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{historyDay(h.created_at)}</span>
+                    {h.changed_by_name && <span className="text-[11px] text-[var(--text-dim)]">· {t("mgmt.by")} {h.changed_by_name}</span>}
                   </div>
                   {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                 </div>
@@ -2131,8 +2148,8 @@ export default function ManagementPage() {
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
               </button>
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shadow-sm">
@@ -2155,8 +2172,8 @@ export default function ManagementPage() {
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
               </button>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
@@ -2233,8 +2250,8 @@ export default function ManagementPage() {
           <>
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => setMobileShowDetail(false)}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.allDepartments")}
+                aria-label={t("mgmt.allDepartments")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.allDepartments")}</span>
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -2445,8 +2462,10 @@ export default function ManagementPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)] flex items-center gap-2">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50">
+          {/* entrance on the INNER node — the outer keeps the centering
+              translate, which a transform keyframe would clobber */}
+          <div className="kx-pop-in px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)] flex items-center gap-2">
             {toast}
             {toastUndo && (
               <button onClick={() => { toastUndo(); setToast(null); setToastUndo(null); }}

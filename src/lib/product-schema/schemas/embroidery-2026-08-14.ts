@@ -64,7 +64,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -170,7 +169,6 @@ export const SINGLE_HEAD_EMBROIDERY_SCHEMA: ProductSchemaDefinition = {
     driveFrameGroup(20),
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };
@@ -187,7 +185,6 @@ export const MULTI_HEAD_EMBROIDERY_SCHEMA: ProductSchemaDefinition = {
     driveFrameGroup(20),
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };

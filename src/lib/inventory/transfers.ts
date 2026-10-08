@@ -435,12 +435,15 @@ export async function transitionTransfer(
       tenantId,
       recipients: [row.requested_by],
       senderId: actorId,
-      subject: `Transfer ${row.transfer_no || ""} ${next}`.trim(),
-      body: next === "approved" ? "Your stock transfer was approved." : "Your stock transfer was cancelled.",
+      tpl: next === "approved"
+        ? { k: "transfer_approved", p: { no: row.transfer_no } }
+        : { k: "transfer_cancelled", p: { no: row.transfer_no } },
       link: "/inventory/transfers",
       type: `transfer_${next}`,
       metadata: { source: "inventory", transfer_id: transferId },
       tag: `transfer:${transferId}`,
+      /* Only the transfer's latest state matters: it replaces an unread older one. */
+      supersede: { transfer_id: transferId },
     });
   }
 
@@ -593,12 +596,13 @@ export async function shipTransfer(
     tenantId,
     recipients: [transfer.requested_by],
     senderId: actorId,
-    subject: `Transfer ${transfer.transfer_no || ""} shipped`.trim(),
-    body: "Your stock transfer left the source warehouse.",
+    tpl: { k: "transfer_shipped", p: { no: transfer.transfer_no } },
     link: "/inventory/transfers",
     type: "transfer_shipped",
     metadata: { source: "inventory", transfer_id: transferId },
     tag: `transfer:${transferId}`,
+    /* Only the transfer's latest state matters: it replaces an unread older one. */
+    supersede: { transfer_id: transferId },
   });
   /* Stock just LEFT the source warehouse — low-stock check per item. */
   for (const it of items) {
@@ -758,12 +762,13 @@ export async function receiveTransfer(
     tenantId,
     recipients: [transfer.requested_by],
     senderId: actorId,
-    subject: `Transfer ${transfer.transfer_no || ""} received`.trim(),
-    body: "Your stock transfer was received at the destination warehouse.",
+    tpl: { k: "transfer_received", p: { no: transfer.transfer_no } },
     link: "/inventory/transfers",
     type: "transfer_received",
     metadata: { source: "inventory", transfer_id: transferId },
     tag: `transfer:${transferId}`,
+    /* Only the transfer's latest state matters: it replaces an unread older one. */
+    supersede: { transfer_id: transferId },
   });
 
   return { ok: true };

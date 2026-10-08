@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, type ComponentType } from "react";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import { useTranslation } from "@/lib/i18n";
 import { salesT } from "@/lib/translations/sales";
 
@@ -74,6 +75,7 @@ export default function SalesApp() {
   const { t, lang } = useTranslation(salesT);
   const searchPlaceholder = useSearchPlaceholder("sales");
   const [activeTab, setActiveTab] = useState<SalesTabId>("dashboard");
+  const tabMotion = useTabMotion(SALES_TAB_IDS.indexOf(activeTab));
   const ActiveModule = MODULE_MAP[activeTab];
 
   return (
@@ -110,7 +112,7 @@ export default function SalesApp() {
 
       {/* ═══════════ CONTENT ═══════════ */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div key={activeTab} className="kx-tab-in">
+        <div key={activeTab} className={tabMotion}>
           <ActiveModule t={t} lang={lang} setActiveTab={setActiveTab} />
         </div>
       </div>

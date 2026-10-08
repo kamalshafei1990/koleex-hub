@@ -17,6 +17,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type {
   BankAccount,
@@ -80,13 +81,13 @@ export async function POST(req: Request) {
       .eq("tenant_id", auth.tenant_id)
       .order("order_date", { ascending: false })
       .limit(1000),
-    supabaseServer
+    allRows(supabaseServer
       .from("finance_payments")
       .select("*")
       .eq("tenant_id", auth.tenant_id)
       .not("status", "in", "(cancelled,bounced)")
       .order("payment_date", { ascending: false })
-      .limit(2000),
+      .order("id"), "payments"),
     supabaseServer
       .from("finance_expenses")
       .select("*")

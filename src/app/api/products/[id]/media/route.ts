@@ -2,6 +2,7 @@ import "server-only";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
@@ -122,5 +123,6 @@ export async function POST(
     console.error("[api/products media POST]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ media: data });
 }

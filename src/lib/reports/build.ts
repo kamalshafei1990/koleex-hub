@@ -8,6 +8,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
+import { canSeeBankAndProfit, canSeeCostData, reportRefusal } from "@/lib/experience";
 import {
   findMissingRequiredFilter,
   getReportEntry,
@@ -40,7 +41,7 @@ export interface BuildAndAuditResult {
 
 export async function buildAndAudit(input: BuildAndAuditInput): Promise<
   | { ok: true; result: BuildAndAuditResult }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: number; error: string; code?: string }
 > {
   const entry = getReportEntry(input.type);
   if (!entry) return { ok: false, status: 400, error: `Unknown report_type '${input.type}'` };
@@ -48,6 +49,26 @@ export async function buildAndAudit(input: BuildAndAuditInput): Promise<
   const missing = findMissingRequiredFilter(input.type, input.filters as Record<string, unknown>);
   if (missing) {
     return { ok: false, status: 400, error: `Missing required filter '${missing}' for ${input.type}` };
+  }
+
+  /* Who may open which report — the screens' two Roles answers
+     (src/lib/experience, reportRefusal). Every report route comes through
+     here, a stored export's print page included (it rebuilds as its
+     viewer), so this one check covers preview, PDF and print. Refused
+     before anything is built or recorded. Guarded by validate:finance-perf §G. */
+  const refusal = reportRefusal(input.type, {
+    bankAndProfit: await canSeeBankAndProfit(input.auth),
+    cost: canSeeCostData(input.auth),
+  });
+  if (refusal) {
+    return {
+      ok: false,
+      status: 403,
+      code: refusal,
+      error: refusal === "needs_bank_profit"
+        ? "This report needs «Bank & Profit» in Roles & Permissions."
+        : "This report needs «Can see private data» in Roles & Permissions.",
+    };
   }
 
   const ctx: ReportBuildContext = {

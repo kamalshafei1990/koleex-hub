@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { recordFxExchange } from "@/lib/finance/currency";
+import { ledgerDraft } from "@/lib/accounting/hooks";
 
 interface ExchangeBody {
   exchange_date: string;
@@ -60,5 +61,7 @@ export async function POST(req: Request) {
     createdBy: auth.account_id,
   });
   if (!r.ok) return NextResponse.json(r, { status: r.code ?? 500 });
+  /* Bank-to-bank: Dr receiving bank / Cr paying bank, difference to FX gain or loss. */
+  if (r.exchange_id) await ledgerDraft("fx_exchange", r.exchange_id, auth.tenant_id, auth.account_id);
   return NextResponse.json(r);
 }

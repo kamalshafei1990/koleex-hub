@@ -16,7 +16,6 @@ import {
   selectCls,
   primaryBtnCls,
   cancelBtnCls,
-  fmtDate,
   makeTranslationHelpers,
   JOB_STATUS_MAP,
   STAGE_MAP,
@@ -46,7 +45,7 @@ const STAGES = ["new", "screening", "interview", "offer", "hired", "rejected"] a
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function RecruitmentModule({ employees, t, lang }: HRModuleProps) {
+export default function RecruitmentModule({ t }: HRModuleProps) {
   /* ── state ── */
   const [jobPostings, setJobPostings] = useState<JobPostingWithNames[]>([]);
   const [selectedPosting, setSelectedPosting] = useState<JobPostingWithNames | null>(null);
@@ -206,7 +205,7 @@ export default function RecruitmentModule({ employees, t, lang }: HRModuleProps)
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@
    These mirror the DB row types but are optimized for form editing.
    --------------------------------------------------------------------------- */
 
+import type { ProductLogistics } from "@/lib/logistics";
 import type {
   FeatureCard, ProductMediaType } from "./supabase";
 
@@ -119,6 +120,11 @@ export interface ProductFormState {
   schema_specs: Record<string, unknown>;
   schema_knowledge: unknown[];
   schema_visibility: Record<string, unknown>;
+  /* Packing & shipping — products.logistics. Deliberately NOT a schema field:
+     a crate is a crate whatever the machine does, so this is asked of every
+     product in every category, like country_of_origin beside it. See
+     src/lib/logistics.ts for the shape and the loading maths. */
+  logistics: ProductLogistics;
 }
 
 export interface ModelFormState {
@@ -147,24 +153,12 @@ export interface ModelFormState {
   supports_complete_set: boolean | null;
   head_only_price: string;
   complete_set_price: string;
-  /* Gross / packed weight (kg) — the existing "weight" column has
-     always been the packed/shipment weight. Net (bare-machine)
-     weight is a separate field below so admins can record both
-     NW and GW like a real commercial invoice. */
-  weight: string;
-  net_weight: string;
-  cbm: string;
-  carton_dimensions: string;
-  packing_type: string;
-  box_include: string;
-  extra_accessories: string;
-  /* Logistics / availability — added in the Technical+Models v2 audit.
-     container_20ft_qty / container_40ft_qty: ints kept as strings to
-     allow empty input. stock_status: "in_stock" | "made_to_order" |
-     "pre_order" | "sold_out". */
-  container_20ft_qty: string;
-  container_40ft_qty: string;
-  container_40hq_qty: string;
+  /* The per-model packing columns (weight, net_weight, cbm,
+     carton_dimensions, packing_type, box_include, extra_accessories,
+     container_*_qty) left the form on 2026-09-22: a member's crates live in
+     logistics_overrides below and its N.W. in specs_overrides. The columns
+     still exist on product_models, frozen and read by nothing. */
+  /* Availability: "in_stock" | "made_to_order" | "pre_order" | "sold_out". */
   stock_status: string;
   order: number;
   visible: boolean;
@@ -189,6 +183,11 @@ export interface ModelFormState {
      live (owner rule: sub-product supplier page = the primary's values
      until edited manually). */
   supplier_overrides?: Record<string, unknown>;
+  /* Member's PACKING differences vs products.logistics — the same shape,
+     partial: a key present here replaces the family value for this member,
+     an absent key inherits it live. Empty = ships exactly like the family.
+     Column: product_models.logistics_overrides (2026-09-22). */
+  logistics_overrides?: Partial<ProductLogistics>;
 }
 
 export interface MediaFormState {
@@ -264,6 +263,16 @@ export interface ProductSupplierFormState {
   /* What unit_cost_cny already includes (display + warning only for now). */
   cost_basis: "factory_only" | "packing" | "delivered";
   cost_includes_tax: boolean;
+  /* The missing cost pieces when the price is NOT full-landed/tax-in —
+     entered manually so pricing can work from the TRUE landed cost.
+     combined=true → packing+delivery as ONE number (combined_cny). */
+  cost_extras: {
+    tax_rate_percent: string;
+    delivery_cny: string;
+    packing_cny: string;
+    combined_cny: string;
+    combined: boolean;
+  };
   payment_terms: string;
   notes: string;
   /* Locale-keyed translations of the price note. Base note above is the
@@ -417,6 +426,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   schema_specs: {},
   schema_knowledge: [],
   schema_visibility: {},
+  logistics: {},
 };
 
 export function createEmptyModel(): ModelFormState {
@@ -425,6 +435,7 @@ export function createEmptyModel(): ModelFormState {
     name_i18n: {},
     tagline_i18n: {},
     supplier_overrides: {},
+    logistics_overrides: {},
     _tempId: crypto.randomUUID(),
     model_name: "",
     slug: "",
@@ -439,16 +450,6 @@ export function createEmptyModel(): ModelFormState {
     supports_complete_set: null,
     head_only_price: "",
     complete_set_price: "",
-    weight: "",
-    net_weight: "",
-    cbm: "",
-    carton_dimensions: "",
-    packing_type: "",
-    box_include: "",
-    extra_accessories: "",
-    container_20ft_qty: "",
-    container_40ft_qty: "",
-    container_40hq_qty: "",
     stock_status: "",
     order: 0,
     visible: true,

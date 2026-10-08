@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { usePresence } from "./usePresence";
 
 /* The panel renders null until it has measured itself, so measuring in a plain
    useEffect costs one painted frame with the scrim up and NO menu under it —
@@ -255,7 +256,12 @@ export default function PopoverPanel({
     if (open) place();
   }, [open, place]);
 
-  if (!open || !rect || typeof document === "undefined") return null;
+  /* Exit choreography (owner-approved motion system): stay mounted while the
+     exit plays; rect survives from the open phase. The window must cover the
+     LONGER of the two exits — the phone sheet slides for 200ms, and a 160ms
+     unmount cut it off mid-slide (a visible blink). */
+  const { mounted, closing } = usePresence(open, 200);
+  if (!mounted || !rect || typeof document === "undefined") return null;
 
   return createPortal(
     <>
@@ -269,7 +275,7 @@ export default function PopoverPanel({
       <div
         aria-hidden
         onMouseDown={() => closeRef.current()}
-        className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm"
+        className={`fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm transition-opacity duration-150 ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         style={{ zIndex: 199 }}
       />
       )}
@@ -290,7 +296,10 @@ export default function PopoverPanel({
         overflowY: "auto",
         zIndex: 200,
       }}
-      className={`kx-glass-pop kx-pop-panel ${className}`}
+      /* pointer-events off while leaving: a click landing on a visually
+         departing row still fired its action (the outside-click listener is
+         already torn down by then). */
+      className={`kx-glass-pop kx-pop-panel kx-pop-arrive ${closing ? `pointer-events-none ${rect.sheet ? "kx-sheet-closing" : "kx-pop-closing"}` : ""} ${className}`}
     >
       {children}
     </div>

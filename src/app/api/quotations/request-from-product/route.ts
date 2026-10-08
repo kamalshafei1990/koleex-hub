@@ -35,41 +35,25 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
-async function nextQuoteNumber(tenantId: string): Promise<string> {
-  /* Mirrors the minting logic in /api/quotations — date-based
-     KL{YYYY}-{MMDD} with -A, -B, -C… for same-day collisions.
-     Customer-portal product requests don't carry their own issue
-     date, so we use today. */
-  const iso = new Date().toISOString().slice(0, 10);
-  const [yStr, mStr, dStr] = iso.split("-");
-  const base = `KL${yStr}-${mStr}${dStr}`;
+/* Customer requests carry no message longer than this; anything past it is
+   almost certainly a paste accident, and the doc column is not a mailbox. */
+const NOTES_MAX = 2000;
 
-  const { data } = await supabaseServer
-    .from("quotations")
-    .select("quote_no")
-    .eq("tenant_id", tenantId)
-    .ilike("quote_no", `${base}%`);
-  const taken = new Set(
-    (data ?? [])
-      .map((r) => (r as { quote_no: string | null }).quote_no)
-      .filter((n): n is string => typeof n === "string"),
-  );
-
-  if (!taken.has(base)) return base;
-  const letter = (n: number): string => {
-    let s = "";
-    let v = n;
-    while (v >= 0) {
-      s = String.fromCharCode(65 + (v % 26)) + s;
-      v = Math.floor(v / 26) - 1;
-    }
-    return s;
-  };
-  for (let i = 0; i < 26 * 27; i++) {
-    const candidate = `${base}-${letter(i)}`;
-    if (!taken.has(candidate)) return candidate;
+/* Same counter as POST /api/quotations (see the numbering note there): one
+   deal number per tenant, issued under a row lock by `next_deal_number`, so a
+   request raised from the catalog gets a KL-QU-<n> that the invoice and
+   contract for the same deal can share. This route used to mint its own
+   date-based KL{YYYY}-{MMDD} numbers, which the rest of the flow could not
+   link to anything. The wrapper is repeated here rather than exported from
+   the route module, because Next only allows handlers as route exports. */
+async function nextDealNumber(tenantId: string): Promise<number> {
+  const { data, error } = await supabaseServer.rpc("next_deal_number", {
+    p_tenant: tenantId,
+  });
+  if (error || data == null) {
+    throw new Error(`Could not allocate a document number: ${error?.message ?? "no value returned"}`);
   }
-  return `${base}-${Date.now()}`;
+  return Number(data);
 }
 
 export async function POST(req: Request) {
@@ -88,7 +72,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "product_id is required" }, { status: 400 });
   }
   const qty = Math.max(1, Math.min(9999, Number(body.qty ?? 1) || 1));
-  const notes = body.notes?.trim() || null;
+  const notesRaw = typeof body.notes === "string" ? body.notes.trim() : "";
+  if (notesRaw.length > NOTES_MAX) {
+    return NextResponse.json(
+      { error: `notes is too long (max ${NOTES_MAX} characters)` },
+      { status: 400 },
+    );
+  }
+  const notes = notesRaw || null;
   const modelId = body.model_id?.trim() || null;
 
   /* Resolve who the quote belongs to. The `quotations.customer_id`
@@ -123,12 +114,20 @@ export async function POST(req: Request) {
     .from("products")
     .select("id, product_name, slug")
     .eq("id", productId)
+    .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  const quoteNo = await nextQuoteNumber(auth.tenant_id);
+  let dealNo: number;
+  try {
+    dealNo = await nextDealNumber(auth.tenant_id);
+  } catch (e) {
+    console.error("[api/quotations/request-from-product]", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: "Could not allocate a quote number" }, { status: 500 });
+  }
+  const quoteNo = `KL-QU-${dealNo}`;
   const issueDate = new Date().toISOString().slice(0, 10);
 
   /* doc jsonb mirrors what the builder UI consumes. Keep it minimal
@@ -161,6 +160,7 @@ export async function POST(req: Request) {
     .insert({
       tenant_id: auth.tenant_id,
       quote_no: quoteNo,
+      deal_no: dealNo,
       customer_id: customerId,
       currency: "USD",
       status: "draft",
@@ -192,15 +192,25 @@ export async function POST(req: Request) {
   /* Also mirror the line into quotation_items so downstream reports
      that join on that table (pricing, landed cost, etc.) see the
      request. Non-fatal if the insert fails — the doc already holds
-     the canonical line data. */
+     the canonical line data — but it IS awaited and logged: a fired-
+     and-forgotten insert on a serverless function can be cut off when
+     the response goes out, and its failure was invisible. */
   const quoteRow = quote as { id: string; quote_no: string };
-  void supabaseServer.from("quotation_items").insert({
+  const { error: itemErr } = await supabaseServer.from("quotation_items").insert({
     quotation_id: quoteRow.id,
     product_id: productRow.id,
     qty,
     unit_price: 0,
     line_discount_percent: 0,
   });
+  if (itemErr) {
+    console.error(
+      "[api/quotations/request-from-product] quotation_items mirror failed:",
+      itemErr.message,
+      "quotation=",
+      quoteRow.id,
+    );
+  }
 
   return NextResponse.json({
     ok: true,

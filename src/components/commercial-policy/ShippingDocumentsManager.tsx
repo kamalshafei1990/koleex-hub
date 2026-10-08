@@ -165,7 +165,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, short code, or category (B/L, CI, CO, fumigation…)"
-          className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
+          className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
         />
       </div>
 
@@ -243,7 +243,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
 function DocCard({ row, canEdit, onEdit, onDelete }: { row: DocRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   const { t } = useTranslation(commercialPolicyT);
   return (
-    <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
+    <div className="kx-glass bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
         <div className="shrink-0 min-w-[64px] flex flex-col items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] py-2 px-3">
           <div className="text-[12px] font-mono font-bold tracking-wide text-[var(--text-primary)]">

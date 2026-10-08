@@ -1,5 +1,5 @@
 import dynamic from "next/dynamic";
-import AdminAuth from "@/components/admin/AdminAuth";
+import AdminAuth from "@/components/admin/AdminAuthGate";
 import BrandLoading from "@/components/ui/BrandLoading";
 
 /* Translator is a utility every signed-in employee needs (supplier chats,

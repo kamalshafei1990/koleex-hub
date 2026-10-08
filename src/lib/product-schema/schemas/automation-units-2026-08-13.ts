@@ -59,7 +59,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -253,7 +252,6 @@ export const POCKET_WELTING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(50),
     physicalGroup(60),
-    packingShippingGroup(70),
     safetyComplianceGroup(80),
   ],
 };
@@ -350,7 +348,6 @@ export const PLACKET_UNIT_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };
@@ -542,7 +539,6 @@ export const POCKET_SETTER_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(60),
     physicalGroup(70),
-    packingShippingGroup(80),
     safetyComplianceGroup(90),
   ],
 };

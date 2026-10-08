@@ -12,7 +12,25 @@
    and the print pipeline never spills onto a phantom blank page.
    --------------------------------------------------------------------------- */
 
-import type { LetterRow, LetterText } from "@/lib/invitations/templates";
+import type { LetterRow, LetterText, Para } from "@/lib/invitations/templates";
+
+/** Render one paragraph: plain runs as text, marked runs in <strong>.
+ *  The pieces carry the emphasis, so the letter never guesses which words
+ *  matter by matching patterns in a finished sentence. */
+function Paragraph({ para }: { para: Para }) {
+  return (
+    <p className="inv-p">
+      {para.map((piece, i) =>
+        piece.strong ? <strong key={i}>{piece.text}</strong> : <span key={i}>{piece.text}</span>,
+      )}
+    </p>
+  );
+}
+
+/** A stable key for a paragraph — its full text. */
+function paraKey(para: Para): string {
+  return para.map((p) => p.text).join("");
+}
 
 /** Group rows into pairs for the two-column passport table. The second of a
  *  final odd pair is undefined, which the caller renders as empty cells. */
@@ -66,16 +84,13 @@ export default function LetterSheet({
         </div>
         <div className="inv-meta-right">
           <p>{text.dateLine}</p>
-          <p className="inv-ref">{text.refLine}</p>
         </div>
       </div>
 
       <p className="inv-salutation">{text.salutation}</p>
 
       {text.intro.map((p) => (
-        <p key={p} className="inv-p">
-          {p}
-        </p>
+        <Paragraph key={paraKey(p)} para={p} />
       ))}
 
       {/* ── passport block ──
@@ -86,7 +101,16 @@ export default function LetterSheet({
           Paired, it is ~40 mm and reads like a passport data page. */}
       <table className="inv-table">
         <tbody>
-          {pairs(text.passportBlock).map(([left, right]) => (
+          {/* The NAME takes the whole first row: four- and five-word
+              passport names wrapped inside a half cell and unbalanced the
+              grid. Everything after it pairs up. */}
+          {text.passportBlock.length > 0 && (
+            <tr>
+              <th scope="row">{text.passportBlock[0]!.label}</th>
+              <td colSpan={3}>{text.passportBlock[0]!.value || "—"}</td>
+            </tr>
+          )}
+          {pairs(text.passportBlock.slice(1)).map(([left, right]) => (
             <tr key={left.label}>
               <th scope="row">{left.label}</th>
               {/* An odd field count leaves the last row with one pair. The
@@ -105,9 +129,7 @@ export default function LetterSheet({
       </table>
 
       {text.body.map((p) => (
-        <p key={p} className="inv-p">
-          {p}
-        </p>
+        <Paragraph key={paraKey(p)} para={p} />
       ))}
 
       {/* ── sign-off ── */}
@@ -143,6 +165,9 @@ export default function LetterSheet({
           <p>{text.signOff.phone}</p>
         </div>
       </div>
+      {/* The reference lives at the sheet's bottom-right — a document control
+      number, the owner's call — not up beside the date. */}
+      <p className="inv-ref-foot">{text.refLine}</p>
     </section>
   );
 }

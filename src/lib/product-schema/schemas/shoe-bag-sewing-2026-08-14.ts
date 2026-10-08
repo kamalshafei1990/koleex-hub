@@ -57,7 +57,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -206,7 +205,6 @@ export const SHOE_SEWING_SCHEMA: ProductSchemaDefinition = {
     frameAndFeedGroup(20, "The catalogue prints \"shoe upper assembly\" first, then automotive seat upholstery, tent manufacturing and luggage frames. Record what the sheet claims, not what the machine could conceivably do — the list is what the maker will support."),
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };
@@ -223,7 +221,6 @@ export const BAG_SEWING_SCHEMA: ProductSchemaDefinition = {
     frameAndFeedGroup(20, "Luggage and bag bodies, and the frame seams that close them. ⚠️ The bag models (SR-5168 / 6168 / 6168D) are printed inside the SHOE series and share its spec header — but no weights, dimensions or speeds of their own are published. Leave a figure blank rather than copying it from the shoe rows."),
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };

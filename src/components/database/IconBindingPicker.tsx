@@ -11,9 +11,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
+import { publicUrl } from "@/lib/storage-url";
 import LockIcon from "@/components/icons/ui/LockIcon";
 
-const MEDIA_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
 
 interface AssetRow {
   id: string;
@@ -95,7 +95,7 @@ export default function IconBindingPicker({
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl max-h-[80vh] flex flex-col bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl max-h-[80vh] flex flex-col bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-3 border-b border-[var(--border-subtle)]">
           <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Choose icon — {label}</h3>
           <p className="text-[11px] text-[var(--text-dim)] mt-0.5">One icon = one meaning. Icons already bound elsewhere will be refused with the owner named.</p>
@@ -134,11 +134,11 @@ export default function IconBindingPicker({
             <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
               {rows.filter((a) => {
                 if (!freeOnly) return true;
-                const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
+                const url = (a.public_url || publicUrl("media", a.svg_path ?? "")).replace(/\s+/g, "");
                 const owner = boundBy.get(url);
                 return !owner || owner === semanticKey;
               }).map((a) => {
-                const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
+                const url = (a.public_url || publicUrl("media", a.svg_path ?? "")).replace(/\s+/g, "");
                 const active = currentUrl === url;
                 const owner = boundBy.get(url);
                 const takenByOther = !!owner && owner !== semanticKey;

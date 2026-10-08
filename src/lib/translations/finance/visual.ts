@@ -1,0 +1,67 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Finance — the `visual.*` strings, split out of the one 287 KB dictionary.
+   See the header of ../finance.ts for why. */
+
+export const FIN_VISUAL: Translations = {
+  "visual.subtitle.long":   { en: "Income · balance sheet · cash flow rendered as charts for fast scanning.",
+                              zh: "以图表形式呈现的利润 · 资产负债 · 现金流，便于快速浏览。",
+                              ar: "الدخل · الميزانية · التدفقات كرسوم للمسح السريع." },
+
+  /* ── Reports ───────────────────────────────────────────────────── */
+  "visual.title":           { en: "Visual Statements",            zh: "可视化报表",              ar: "القوائم المرئية" },
+  "visual.subtitle":        { en: "Income · balance sheet · cash flow rendered as charts for fast scanning.",
+                              zh: "以图表形式呈现的利润表 · 资产负债表 · 现金流量表，便于快速浏览。",
+                              ar: "الدخل · الميزانية · التدفقات النقدية كرسوم بيانية للمسح السريع." },
+
+  /* ── Visual statements ────────────────────────────────────────── */
+  "visual.pageTitle":          { en: "Overview",                        zh: "总览",                    ar: "نظرة عامة" },
+  "visual.pageSubtitle":       { en: "Income · Balance Sheet · Cash Flow",
+                                  zh: "收入 · 资产负债 · 现金流",
+                                  ar: "الدخل · الميزانية · التدفقات النقدية" },
+  "visual.printVersion":       { en: "Print version",                   zh: "打印版",                  ar: "نسخة للطباعة" },
+  "visual.totalRevenue":       { en: "TOTAL REVENUE",                   zh: "总收入",                  ar: "إجمالي الإيراد" },
+  "visual.netIncome":          { en: "NET INCOME",                      zh: "净利润",                  ar: "صافي الدخل" },
+  "visual.tab.income":         { en: "Income",                          zh: "利润",                    ar: "الدخل" },
+  "visual.tab.balance":        { en: "Balance Sheet",                   zh: "资产负债表",              ar: "الميزانية" },
+  "visual.tab.cashflow":       { en: "Cash Flow",                       zh: "现金流量表",              ar: "التدفقات النقدية" },
+  "visual.gran.week":          { en: "Week",                            zh: "周",                      ar: "أسبوع" },
+  "visual.gran.month":         { en: "Month",                           zh: "月",                      ar: "شهر" },
+  "visual.gran.quarter":       { en: "Quarter",                         zh: "季度",                    ar: "ربع" },
+  "visual.gran.year":          { en: "Year",                            zh: "年",                      ar: "سنة" },
+  "visual.loading":            { en: "Loading statements…",             zh: "正在加载报表…",            ar: "جارٍ تحميل القوائم…" },
+  "visual.prior":              { en: "Prior",                           zh: "上期",                    ar: "السابق" },
+  "visual.current":            { en: "Current",                         zh: "本期",                    ar: "الحالي" },
+  "visual.section.revenues":   { en: "Revenues",                        zh: "收入",                    ar: "الإيرادات" },
+  "visual.section.expenses":   { en: "Expenses",                        zh: "费用",                    ar: "المصروفات" },
+  "visual.section.assets":     { en: "Assets",                          zh: "资产",                    ar: "الأصول" },
+  "visual.section.liabilities":{ en: "Liabilities",                     zh: "负债",                    ar: "الخصوم" },
+  "visual.section.equity":     { en: "Equity",                          zh: "权益",                    ar: "حقوق الملكية" },
+  "visual.row.totalRev":       { en: "Total Revenues",                  zh: "总收入",                  ar: "إجمالي الإيرادات" },
+  "visual.row.totalExp":       { en: "Total Expenses",                  zh: "总费用",                  ar: "إجمالي المصروفات" },
+  "visual.row.opIncome":       { en: "Operating Income",                zh: "营业利润",                ar: "الربح التشغيلي" },
+  "visual.row.netIncome":      { en: "Net Income",                      zh: "净利润",                  ar: "صافي الدخل" },
+  "visual.row.totalAssets":    { en: "Total Assets",                    zh: "总资产",                  ar: "إجمالي الأصول" },
+  "visual.row.totalLiab":      { en: "Total Liabilities",               zh: "总负债",                  ar: "إجمالي الخصوم" },
+  "visual.row.totalEquity":    { en: "Total Equity",                    zh: "总权益",                  ar: "إجمالي حقوق الملكية" },
+  "visual.row.totalLiabEq":    { en: "Total Liabilities & Equity",      zh: "负债与权益合计",          ar: "إجمالي الخصوم وحقوق الملكية" },
+  "visual.row.openingCash":    { en: "Opening cash",                    zh: "期初现金",                ar: "النقد الافتتاحي" },
+  "visual.row.netChange":      { en: "Net change in cash",              zh: "现金净变动",              ar: "صافي التغير في النقد" },
+  "visual.row.closingCash":    { en: "Closing cash",                    zh: "期末现金",                ar: "النقد الختامي" },
+  "visual.row.subtotal":       { en: "{name} subtotal",                 zh: "{name} 小计",             ar: "إجمالي فرعي لـ{name}" },
+  "visual.emptyRev":           { en: "No revenue posted yet.",          zh: "尚未过账任何收入。",         ar: "لم تُسجَّل إيرادات بعد." },
+  "visual.emptyLiab":          { en: "No liabilities posted.",          zh: "未过账任何负债。",          ar: "لم تُسجَّل خصوم." },
+  "visual.bsMismatch":         { en: "⚠ Balance sheet does not reconcile.",
+                                  zh: "⚠ 资产负债表不平衡。",
+                                  ar: "⚠ الميزانية غير متوازنة." },
+  "visual.period.label":       { en: "Period",                          zh: "周期",                    ar: "الفترة" },
+  "visual.period.prev":        { en: "Previous period",                 zh: "上一周期",                ar: "الفترة السابقة" },
+  "visual.period.next":        { en: "Next period",                     zh: "下一周期",                ar: "الفترة التالية" },
+  "visual.compare.add":        { en: "+ Compare",                       zh: "+ 对比",                  ar: "+ مقارنة" },
+  "visual.compare.vs":         { en: "vs",                              zh: "对比",                    ar: "مقابل" },
+  "visual.compare.remove":     { en: "Remove comparison",               zh: "移除对比",                ar: "إزالة المقارنة" },
+  /* Shown instead of the statements to a role without «Bank & Profit». */
+  "visual.locked":             { en: "The financial statements open with «Bank & Profit» in Roles & Permissions.",
+                                  zh: "财务报表需要在角色与权限中拥有「Bank & Profit」才能查看。",
+                                  ar: "القوائم المالية تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
+};

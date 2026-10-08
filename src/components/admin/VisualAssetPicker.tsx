@@ -75,7 +75,7 @@ export default function VisualAssetPicker({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl max-h-[82vh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-3xl max-h-[82vh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -18,8 +18,8 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
@@ -31,6 +31,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { resolveHrFileUrl } from "@/components/hr/HrFileField";
+import EmployeeHr360, { HR360_TABS, type Hr360Tab } from "@/components/employees/EmployeeHr360";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   fetchEmployeeProfile,
@@ -57,8 +58,11 @@ const STATUS_COLORS: Record<string, string> = {
   inactive: "text-slate-400 bg-slate-400/10 border-slate-400/20",
 };
 
-const TABS = ["overview", "activity", "hr"] as const;
-type Tab = (typeof TABS)[number];
+const BASE_TABS = ["overview", "activity", "hr"] as const;
+/* Phase E — the HR half of the profile, shown only to a viewer who holds
+   HR·view (the same gate the HR app itself applies to this data). */
+const ALL_TABS = [...BASE_TABS, ...HR360_TABS] as const;
+type Tab = (typeof ALL_TABS)[number];
 
 /* ═══════════════════════════════════════════════════
    HELPERS
@@ -423,6 +427,9 @@ export default function EmployeeProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const hrView = perms.can("HR", "view");
+  const TABS: readonly Tab[] = hrView ? ALL_TABS : BASE_TABS;
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -447,12 +454,16 @@ export default function EmployeeProfilePage({
       if (cancelled) return;
       if (!prof) { setNotFound(true); setLoading(false); return; }
       setProfile(prof);
-      /* Kick off the activity load in parallel — profile header can
-         render immediately while the cross-app queries resolve. */
+      /* Paint NOW — one round-trip. The old order kept loading=true until
+         the activity call also resolved, so the whole page (hero included)
+         sat behind the splash for TWO sequential round-trips while the
+         comment claimed the header "renders immediately". The activity tab
+         already handles activity === null with its own pending state, so it
+         simply fills in when the cross-app queries land. */
+      setLoading(false);
       const act = await fetchEmployeeActivity(prof.employee.id, prof.account?.id ?? null);
       if (cancelled) return;
       setActivity(act);
-      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [id]);
@@ -668,7 +679,8 @@ export default function EmployeeProfilePage({
             {TABS.map((tabKey) => {
               const base = tabKey === "overview" ? t("tab.overview")
                 : tabKey === "activity" ? t("tab.activity")
-                : t("tab.hr");
+                : tabKey === "hr" ? t("tab.hr")
+                : t(`tab.${tabKey}`);
               const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
               return (
                 <button
@@ -689,6 +701,12 @@ export default function EmployeeProfilePage({
           </nav>
         </div>
 
+        <div key={tab} className={tabMotion}>
+        {(HR360_TABS as readonly string[]).includes(tab) && (
+          <div className="px-4 md:px-6 py-4">
+            <EmployeeHr360 employeeId={id} tab={tab as Hr360Tab} />
+          </div>
+        )}
         {tab === "overview" && (
           <>
             <GroupLabel>{t("grp.identity")}</GroupLabel>
@@ -795,6 +813,18 @@ export default function EmployeeProfilePage({
 
         {tab === "hr" && (
           <>
+            {hrView && (
+              /* Phase F — the employment contract, generated from this record,
+                 one language per print (a signed page must be in ONE language). */
+              <div className="mx-4 md:mx-6 mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-[13px]">
+                <span className="font-medium text-[var(--text-primary)]">{t("hr.contractPrint")}</span>
+                {(["en", "zh", "ar"] as const).map((l) => (
+                  <a key={l} href={`/employment-contracts/${id}/print?lang=${l}&auto=1`} target="_blank" rel="noopener noreferrer" className="h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] inline-flex items-center">
+                    {l === "en" ? "English" : l === "zh" ? "中文" : "العربية"}
+                  </a>
+                ))}
+              </div>
+            )}
             <GroupLabel>{t("grp.compensation")}</GroupLabel>
             <Sec icon={CreditCardIcon} title={t("hr.compensation")}>
               <FieldGrid
@@ -864,6 +894,7 @@ export default function EmployeeProfilePage({
             <BehaviorStanding employeeId={employee.id} t={t} />
           </>
         )}
+        </div>
       </div>
 
       {/* ── Delete confirm ── */}

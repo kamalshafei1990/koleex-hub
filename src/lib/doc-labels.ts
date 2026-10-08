@@ -43,6 +43,7 @@ const LABELS = {
   "party.email":           { en: "Email",               zh: "邮箱" },
   "party.web":             { en: "Web",                 zh: "网址" },
   "party.acid":            { en: "ACID No.",            zh: "ACID 编号" },
+  "party.contactPerson":   { en: "Contact Person:",     zh: "联系人：" },
 
   /* ── Items table ── */
   "col.no":                { en: "NO.",                 zh: "序号" },
@@ -58,6 +59,7 @@ const LABELS = {
   "sum.shipping":          { en: "Shipping",            zh: "运费" },
   "sum.tax":               { en: "Tax",                 zh: "税费" },
   "sum.discount":          { en: "Discount",            zh: "折扣" },
+  "sum.other":             { en: "Other",               zh: "其他" },
   "sum.total":             { en: "Total",               zh: "总计" },
   "sum.totalInLetters":    { en: "Total in Letters",    zh: "大写金额" },
 

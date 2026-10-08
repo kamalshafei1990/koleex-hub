@@ -21,6 +21,16 @@ export const websiteT: Translations = {
   "refresh":       { en: "Refresh",        zh: "刷新",       ar: "تحديث" },
   "visitWebsite":  { en: "Visit Website",  zh: "访问网站",   ar: "زيارة الموقع" },
   "openInNewTab":  { en: "Open in New Tab", zh: "在新标签页打开", ar: "فتح في تبويب جديد" },
+  "loadingPreview": { en: "Loading preview…", zh: "正在加载预览…", ar: "جارٍ تحميل المعاينة…" },
+
+  /* Page Builder tab — the site's pages, until the builder moves into the Hub */
+  "builder.pages":      { en: "Pages",                zh: "页面",       ar: "الصفحات" },
+  "builder.sections":   { en: "sections",             zh: "个版块",     ar: "أقسام" },
+  "builder.builtIn":    { en: "Built-in content",     zh: "内置内容",   ar: "محتوى مدمج" },
+  "builder.updated":    { en: "Updated",              zh: "更新于",     ar: "آخر تحديث" },
+  "builder.loadFailed": { en: "The pages could not be loaded.", zh: "无法加载页面。", ar: "تعذّر تحميل الصفحات." },
+  "builder.retry":      { en: "Try again",            zh: "重试",       ar: "حاول مرة أخرى" },
+  "builder.empty":      { en: "No pages yet.",        zh: "暂无页面。", ar: "لا توجد صفحات بعد." },
 
   /* Viewport toggles */
   "desktop":       { en: "Desktop",        zh: "桌面",       ar: "سطح المكتب" },

@@ -7,6 +7,7 @@
 import Link from "next/link";
 import type { AnalyticsWindow } from "@/lib/security/view-model";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const WINDOWS: { id: AnalyticsWindow; label: string }[] = [
@@ -27,8 +28,11 @@ export default function SecurityHeader({ window, onWindow, onRefresh, refreshing
   return (
     <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-3">
-        <Link href="/accounts" className="mt-1 text-[var(--text-dim)] hover:text-[var(--text-primary)]" aria-label="Back to accounts">
-          <ArrowLeftIcon className="h-5 w-5" />
+        {/* The Hub's back chip, not a bare arrow — the same control as every
+            app's "← Hub", named for where it goes. */}
+        <Link href="/accounts" className={BACK_CHROME} aria-label="Back to accounts">
+          <ArrowLeftIcon size={14} />
+          <span className="hidden text-[12px] font-medium sm:inline">Accounts</span>
         </Link>
         <div>
           <h1 className="text-lg font-semibold text-[var(--text-primary)]">Login Security</h1>

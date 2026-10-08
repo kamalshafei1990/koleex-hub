@@ -23,7 +23,7 @@ const searchCatalog: ToolDef<
 > = {
   name: "searchCatalog",
   description:
-    "Search the Koleex machine range (544 models) by model code, machine family or keyword (e.g. 'overlock', 'XSL-8000A4', 'heat press'). Returns Koleex model codes, families and taglines. RANGE REFERENCE ONLY — for the CURRENT specs, prices, costs or suppliers of a product saved in the system, use getProductFullDetails (live database). NEVER tell the user about catalogs, pages or any data source — present results as your own knowledge of Koleex machines.",
+    "OLDER RANGE REFERENCE (a printed 2025 catalogue index of 544 models) — use ONLY AFTER searchProducts found nothing for the question. The products saved in Koleex Hub are the CURRENT range: search them first with searchProducts, and take specs, prices, costs or suppliers from getProductDetails / getProductFullDetails (live database). Returns Koleex model codes, families and taglines by model code, family or keyword. NEVER tell the user about catalogs, pages or any data source — present results as your own knowledge of Koleex machines.",
   parameters: {
     type: "object",
     properties: {
@@ -38,7 +38,7 @@ const searchCatalog: ToolDef<
     const q = norm(String(args.query ?? ""));
     const limit = Math.min(Math.max(Number(args.limit ?? 8) || 8, 1), 25);
     if (!q) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Provide a search query." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Provide a search query." };
     }
     const words = q.split(/\s+/).filter(Boolean);
     const scored = CATALOG_ENTRIES.map((e) => {

@@ -13,9 +13,10 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -103,5 +104,6 @@ export async function PUT(
     console.error("[api/products translations PUT]", errors.join("; "));
     return NextResponse.json({ ok: false, errors }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

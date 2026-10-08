@@ -1,0 +1,783 @@
+{
+ "section": "print",
+ "items": {
+  "product-catalogue": {
+   "specs": [
+    {
+     "k": "Editions",
+     "v": "Full range · one per category · one per market / language · mini catalogue"
+    },
+    {
+     "k": "Size",
+     "v": "House size 210 × 270 mm (A4, A5 or square 210 × 210 mm where an edition needs it)"
+    },
+    {
+     "k": "Binding",
+     "v": "Perfect bound; saddle-stitched when thin; Wire-O to lie flat"
+    },
+    {
+     "k": "Cover",
+     "v": "Black with the machine and the logo; white is the second version (ch. 47)"
+    },
+    {
+     "k": "Order",
+     "v": "Cover · contents with machine icons · a category opener per machine kind · a page or spread per machine · services, contact and the QR at the back"
+    },
+    {
+     "k": "Pages",
+     "v": "Light-led for easy reading and office printing; the hero on black, product pages on white (ch. 64)"
+    },
+    {
+     "k": "Data",
+     "v": "Exactly as Koleex Hub's product data — the same as the website; blank is better than a guess"
+    },
+    {
+     "k": "Digital",
+     "v": "PDF, and a flip-book link with a QR"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    }
+   ],
+   "logo": "Cover: the full logo top-left, white on black. Every page: the logo top-left small, the section bottom-left, the page number bottom-right.",
+   "do": [
+    "KOLEEX machines only, by their Hub names and models",
+    "Our own photographs (ch. 63)"
+   ],
+   "dont": [
+    "A supplier's catalogue with our logo added",
+    "A supplier's name or code anywhere",
+    "Prices — they go in quotations only",
+    "Borrowed photos or drawings"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    103,
+    47,
+    64,
+    63
+   ]
+  },
+  "company-profile": {
+   "specs": [
+    {
+     "k": "Editions",
+     "v": "Full profile book · short 8-page profile · one-page profile · presentation-folder insert"
+    },
+    {
+     "k": "Format",
+     "v": "Landscape 16:10 — the PDF for screens and a printed booklet (ch. 102; owner, 01/10/2026)"
+    },
+    {
+     "k": "Cover",
+     "v": "Black, matching the catalogue"
+    },
+    {
+     "k": "Spreads",
+     "v": "A photograph on one page, the title and text on the other"
+    },
+    {
+     "k": "Every page",
+     "v": "Logo top-left; section and page name bottom-left; page number bottom-right"
+    },
+    {
+     "k": "Style",
+     "v": "Black, white and silver — photos with numbered callouts; no drawings, no neon, no 3D"
+    },
+    {
+     "k": "Contents",
+     "v": "Founder's letter (signed, with the portrait) · machines by category and services · how we inspect, test and pack — in our own facilities · only real, current offices and agents · one address, one phone, one e-mail, the website, the QR"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    }
+   ],
+   "logo": "Top-left on every page; the cover's logo white on black.",
+   "do": [
+    "Every number (countries, years, machines sold) with a source we can show",
+    "Customer and partner logos only with written permission (ch. 44)"
+   ],
+   "dont": [
+    "Stock photos of offices, people, cities or handshakes",
+    "Supplier names — ever",
+    "Leadership shown as anything but real people in their real roles"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    102,
+    44,
+    63
+   ]
+  },
+  "machine-brochure": {
+   "specs": [
+    {
+     "k": "Formats",
+     "v": "A4 landscape 8 pages · A4 portrait 4 pages · A3 folded to A4"
+    },
+    {
+     "k": "Content",
+     "v": "The hero on black, the numbers, close-ups, the specifications, the QR"
+    },
+    {
+     "k": "Data",
+     "v": "From Koleex Hub's product data — the same as the spec sheet and the website"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    },
+    {
+     "k": "QR",
+     "v": "The KOLEEX QR: black on white, level H, a four-module quiet zone, at least 20 × 20 mm, tested on two phones (ch. 104)"
+    }
+   ],
+   "logo": "The full logo top-left of the cover, white on black; small top-left inside.",
+   "do": [
+    "One machine per brochure",
+    "Our own photographs, numbered callouts"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Supplier names or codes"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104,
+    105,
+    63
+   ]
+  },
+  "category-brochure": {
+   "specs": [
+    {
+     "k": "Formats",
+     "v": "Tri-fold A4 → 99 × 210 mm (the book's piece) · bi-fold A4 · Z-fold · gate-fold (premium)"
+    },
+    {
+     "k": "Content",
+     "v": "One machine category: what it is for, the machines in it with their machine icons, the QR"
+    },
+    {
+     "k": "Front",
+     "v": "The logo top-left, one line, one machine"
+    },
+    {
+     "k": "Back",
+     "v": "Key points, contact, QR — light-led"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    },
+    {
+     "k": "QR",
+     "v": "The KOLEEX QR: black on white, level H, a four-module quiet zone, at least 20 × 20 mm, tested on two phones (ch. 104)"
+    }
+   ],
+   "logo": "Top-left of the front panel, 30 mm, white on black or black on white.",
+   "do": [
+    "One category per brochure",
+    "The website or WhatsApp as the one next step"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Every product at once"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104,
+    59
+   ]
+  },
+  "flyer": {
+   "specs": [
+    {
+     "k": "Formats",
+     "v": "A5 148 × 210 mm both sides (the book's flyer) · A4 one side · DL rack card 99 × 210 mm"
+    },
+    {
+     "k": "Content",
+     "v": "One machine, one service or one event"
+    },
+    {
+     "k": "Digital twin",
+     "v": "A WhatsApp leaflet 1080 × 1350 px — made in the product post template at 4:5"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    },
+    {
+     "k": "QR",
+     "v": "The KOLEEX QR: black on white, level H, a four-module quiet zone, at least 20 × 20 mm, tested on two phones (ch. 104)"
+    }
+   ],
+   "logo": "Top-left of the front, 30 mm.",
+   "do": [
+    "Front: the logo, one line, one machine · back: key points, contact, QR"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Several messages on one flyer"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104
+   ],
+   "templates": [
+    "product-post"
+   ]
+  },
+  "sell-sheet-for-dealers": {
+   "specs": [
+    {
+     "k": "Formats",
+     "v": "A4 one page · A4 two sides"
+    },
+    {
+     "k": "Content",
+     "v": "Key benefits, who it is for, a comparison that names no competitor, the QR — never a price"
+    },
+    {
+     "k": "Data",
+     "v": "From Koleex Hub's product data"
+    }
+   ],
+   "logo": "45 mm top-left, as on the house sheet.",
+   "do": [
+    "Benefits the dealer can repeat in one sentence each"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Competitors named or shown",
+    "Supplier names or codes"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    105,
+    128
+   ]
+  },
+  "service-and-spare-parts-leaflet": {
+   "specs": [
+    {
+     "k": "Formats",
+     "v": "DL leaflet 99 × 210 mm · A5 flyer"
+    },
+    {
+     "k": "Content",
+     "v": "What service we give, how to book it, how to order parts (the part number from the part label), the QR"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic first; more of the 19 machine languages on request — each a reviewed translation, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    },
+    {
+     "k": "QR",
+     "v": "The KOLEEX QR: black on white, level H, a four-module quiet zone, at least 20 × 20 mm, tested on two phones (ch. 104)"
+    }
+   ],
+   "logo": "Top-left of the front, 30 mm.",
+   "do": [
+    "The KOLEEX part numbers as on the part labels (ch. 112)"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Supplier part codes"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104,
+    112
+   ]
+  },
+  "product-posters": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "A2 420 × 594 · A1 594 × 841 · A0 841 × 1189 mm (the book); 70 × 100 cm and B1 where a frame needs them"
+    },
+    {
+     "k": "Material",
+     "v": "Paper 200 g/m² · synthetic (tear-proof) · foam board"
+    },
+    {
+     "k": "Style",
+     "v": "One message, one image, the logo — readable in three seconds; the machine on black or on white"
+    },
+    {
+     "k": "Headline",
+     "v": "Readable from 5 m: at least 60 mm tall letters on A1"
+    },
+    {
+     "k": "Grid",
+     "v": "6 columns, 30 mm margins on A2 (ch. 55)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3–5 mm bleed, images at 150 dpi at full size, rich black for large dark areas (ch. 48)"
+    }
+   ],
+   "logo": "Top-left, about a sixth of the width; the one message in silver or white.",
+   "do": [
+    "The logo top-left, one message, the machine"
+   ],
+   "dont": [
+    "Many messages, small type, every product at once",
+    "Every office, phone number and social account",
+    "Prices — they go in quotations only"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    106,
+    55,
+    48
+   ]
+  },
+  "factory-and-safety-posters": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Safety rules · machine maintenance steps · 5S / clean workplace · quality"
+    },
+    {
+     "k": "Sizes",
+     "v": "A2 · A3"
+    },
+    {
+     "k": "Safety",
+     "v": "ISO 7010 symbols in the ISO 3864 layout and colours — never restyled (ch. 109)"
+    },
+    {
+     "k": "Language",
+     "v": "English and the local language; the symbol or code is the biggest thing on the sheet (ch. 119)"
+    }
+   ],
+   "logo": "Small, top-left or at the foot — the safety message comes first.",
+   "do": [
+    "The same words as the machine's labels and the manual"
+   ],
+   "dont": [
+    "Safety colours used for decoration",
+    "Redrawn safety symbols"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    119,
+    109
+   ]
+  },
+  "event-and-recruitment-posters": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Event poster · recruitment poster · training-day poster"
+    },
+    {
+     "k": "Sizes",
+     "v": "A2 · A3 · a digital screen version"
+    },
+    {
+     "k": "Event",
+     "v": "Event name, date DD/MM/YYYY, place, one line, the QR (ch. 121)"
+    },
+    {
+     "k": "Hiring",
+     "v": "The job title, region and city, 3–5 lines on skills, experience and languages, one way to apply and the closing date (ch. 125)"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3–5 mm bleed, images at 150 dpi at full size (ch. 48)"
+    }
+   ],
+   "logo": "Top-left, as on the product posters.",
+   "do": [
+    "Our own photographs of our own people and events"
+   ],
+   "dont": [
+    "Age, gender, religion, nationality or photos that suggest them in a job poster",
+    "Several events on one poster"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    106,
+    121,
+    125
+   ],
+   "templates": [
+    "event-post",
+    "hiring-post"
+   ]
+  },
+  "roll-up-banner": {
+   "specs": [
+    {
+     "k": "Size",
+     "v": "850 × 2000 mm (the book); 1000 or 1200 × 2000 mm for larger booths"
+    },
+    {
+     "k": "Layout",
+     "v": "Dark-led: the logo 500 mm wide at the top, the machine in the middle, the contact low — above the lower 200 mm, which stays empty (hidden by tables and legs)"
+    },
+    {
+     "k": "Material",
+     "v": "Matte, non-reflective: anti-curl PET film or fabric — photographs well under hall lights"
+    }
+   ],
+   "logo": "500 mm wide at the top of an 850 mm roll-up, white on black.",
+   "do": [
+    "One message, readable from across the aisle"
+   ],
+   "dont": [
+    "Anything in the lower 200 mm",
+    "Glossy film",
+    "Prices — they go in quotations only"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    115,
+    39
+   ]
+  },
+  "x-banner-and-pop-up-wall": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "X-banner 60 × 160 cm · pop-up wall 3 × 3 · tension fabric wall"
+    },
+    {
+     "k": "Walls",
+     "v": "Black, one headline in silver or white, the machine; the white version where the hall or a partner's space is white (ch. 114)"
+    },
+    {
+     "k": "Material",
+     "v": "Matte fabric (or PVC for the X-banner) — no shine under hall lights"
+    },
+    {
+     "k": "Black",
+     "v": "Rich black C60 M40 Y40 K100 (ch. 48)"
+    }
+   ],
+   "logo": "At the top of the wall, above head height, white on black; on the X-banner, the top third.",
+   "do": [
+    "One headline per wall"
+   ],
+   "dont": [
+    "Small text or QR codes above head height",
+    "Prices — they go in quotations only"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    114,
+    115,
+    48
+   ]
+  },
+  "banners": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "PVC banner with eyelets · mesh banner (windy places) · indoor fabric banner · hanging ceiling banner (exhibitions)"
+    },
+    {
+     "k": "Size",
+     "v": "By place — a template per size"
+    },
+    {
+     "k": "Hanging banner",
+     "v": "The logo, the booth number (the largest text), one line, the hall and the direction"
+    },
+    {
+     "k": "Letters",
+     "v": "About 25 mm tall for every 3 m of reading distance (ch. 39)"
+    },
+    {
+     "k": "Material",
+     "v": "Blockout fabric for hanging banners — daylight turns thin black fabric grey"
+    }
+   ],
+   "logo": "Across the top, never rotated; white on black.",
+   "do": [
+    "One line and the direction on a hanging banner"
+   ],
+   "dont": [
+    "QR codes or small text above head height",
+    "Prices — they go in quotations only"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    115,
+    39
+   ]
+  },
+  "flags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Feather flag · teardrop flag · pole flag · vertical indoor flag · desk flag"
+    },
+    {
+     "k": "Colour",
+     "v": "Black with the white logo · white with the black logo"
+    },
+    {
+     "k": "Logo",
+     "v": "Horizontal across the top of the flag — never rotated to run down a tall flag (ch. 40)"
+    }
+   ],
+   "logo": "Horizontal, across the top, the full logo — never rotated, never the K alone.",
+   "do": [
+    "The same flag set at every event"
+   ],
+   "dont": [
+    "The logo running vertically down the flag",
+    "Coloured flags"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    40,
+    115
+   ]
+  },
+  "outdoor-advertising": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Billboard · airport light box · bus / metro ad · building wrap"
+    },
+    {
+     "k": "Style",
+     "v": "The machine on black, a big headline — one message, readable in three seconds"
+    },
+    {
+     "k": "Headline",
+     "v": "Six words or fewer; about 25 mm letter height per 3 m of reading distance (ch. 39)"
+    },
+    {
+     "k": "Destination",
+     "v": "The website or WhatsApp — one, large"
+    }
+   ],
+   "logo": "Top-left, large, white on black.",
+   "do": [
+    "One message, one machine, one action, the logo"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Red bursts, many messages, no logo",
+    "Small text"
+   ],
+   "vendor": "Send the master files at full size (images 150 dpi at 100%, rich black C60 M40 Y40 K100 for large black areas — ch. 48). Ask for a printed strip of the real material before the run; the Marketing Manager checks it, the Founder & CEO approves (ch. 134).",
+   "book": [
+    106,
+    89,
+    39
+   ]
+  },
+  "magazine-and-newspaper-ads": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Full page · half page · quarter page · double-page spread · show-directory listing — each publication's own sizes"
+    },
+    {
+     "k": "Style",
+     "v": "The machine on black or on white; one message, one machine, one action, the logo"
+    },
+    {
+     "k": "Headline",
+     "v": "Six words or fewer"
+    },
+    {
+     "k": "Call to action",
+     "v": "Names what happens: \"Chat on WhatsApp\", \"Download the spec sheet\""
+    },
+    {
+     "k": "Language",
+     "v": "The language of the readers, with its own reviewed translation"
+    },
+    {
+     "k": "Print",
+     "v": "The publication's specification; otherwise CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a; matte coated 170–250 g/m² (ch. 104)"
+    }
+   ],
+   "logo": "Top-left, as on the posters.",
+   "do": [
+    "The QR to the matching machine page — never the home page for a product ad"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Best / lowest / free / limited-time claims",
+    "Several products in one ad"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    89,
+    106
+   ]
+  },
+  "dealer-shop-kit": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "\"Authorized dealer\" window decal · brochure rack · counter display · shelf talkers and wobblers · hanging danglers · floor stickers · door opening-hours sticker"
+    },
+    {
+     "k": "Style",
+     "v": "Black with the white logo (silver only for words) · white with the black logo"
+    },
+    {
+     "k": "Window decal",
+     "v": "The Authorized badge, 300–400 mm wide, cut vinyl, at eye height near the door"
+    },
+    {
+     "k": "Inside",
+     "v": "KOLEEX machines together in one area; one KOLEEX poster or roll-up for the area — not every wall"
+    },
+    {
+     "k": "Material",
+     "v": "Catalogues and brochures from the official files only"
+    }
+   ],
+   "logo": "White on black, or black on white; the dealer's own name stays the shop's name.",
+   "do": [
+    "The Authorized badge on the window",
+    "KOLEEX material on its own panels"
+   ],
+   "dont": [
+    "Our logo as the shop's name",
+    "KOLEEX material sharing a panel with another machine brand",
+    "Light boxes (halo-lit white letters only)"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    129,
+    128,
+    39
+   ]
+  },
+  "printed-promotions": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "\"Ask us about…\" coupon card · trade-in campaign leaflet · free service-check voucher"
+    },
+    {
+     "k": "Content",
+     "v": "The offer in words, the valid-until date DD/MM/YYYY, the terms line, the QR"
+    },
+    {
+     "k": "Approval",
+     "v": "Every offer approved by the Founder & CEO before print (ch. 134)"
+    }
+   ],
+   "logo": "Top-left, 30 mm.",
+   "do": [
+    "A number on every voucher, recorded when it is used"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Offers without an end date",
+    "Best / lowest / free-gift claims"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104,
+    134,
+    132
+   ]
+  },
+  "postcards": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "A6 148 × 105 mm · DL 99 × 210 mm"
+    },
+    {
+     "k": "Kinds",
+     "v": "Machine postcard set · event save-the-date card · thank-you postcard"
+    },
+    {
+     "k": "Board",
+     "v": "350 g/m² card, as the note cards: black with the white logo, or white with black print"
+    },
+    {
+     "k": "Print",
+     "v": "CMYK, 3 mm bleed, PDF/X-1a"
+    }
+   ],
+   "logo": "Front: top-left, 25 mm; back: at the foot.",
+   "do": [
+    "Our own photographs",
+    "A handwritten line on the thank-you card"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Stock photos"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    104,
+    63
+   ]
+  },
+  "direct-mail-pack": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Envelope + letter + flyer · box mailer with a sample"
+    },
+    {
+     "k": "Envelope and letter",
+     "v": "The house envelope and letterhead (ch. 92), the letter signed"
+    },
+    {
+     "k": "Mailer",
+     "v": "The mailer box of the packaging section, with its own logo rules"
+    },
+    {
+     "k": "Tracking",
+     "v": "A QR per campaign with its UTM tag, so every reply lands in Koleex Hub"
+    }
+   ],
+   "logo": "As on each piece: the envelope's and letterhead's own places (ch. 92); the mailer's own (packaging).",
+   "do": [
+    "One message per pack",
+    "The addresses from Koleex Hub contacts"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Samples that break the supplier-confidentiality rule (no supplier names or codes)"
+   ],
+   "vendor": "Send the master files as PDF/X-1a: CMYK, 3 mm bleed, 300 dpi images, fonts outlined, named by the file-naming rules (ch. 135). Ask for a physical proof on the real paper; the Marketing Manager checks it against the book, the Founder & CEO approves anything new, printed, large or public-facing (ch. 134).",
+   "book": [
+    92,
+    104,
+    89
+   ]
+  }
+ }
+}

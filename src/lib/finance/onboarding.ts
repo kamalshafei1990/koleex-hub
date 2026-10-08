@@ -35,6 +35,9 @@ export interface SetupCard {
   status: CardStatus;
   count: number;
   total: number;
+  /** The total is a figure this caller may not see (src/lib/experience,
+   *  hideSetupCardTotal): it came as 0 and shows «•••». */
+  total_hidden?: boolean;
   currency: string;
   href: string;
 }

@@ -4,8 +4,17 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { DashboardKpi, DashboardPeriod } from "@/lib/finance/types";
+import { bankLedgerBalances } from "@/lib/finance/bank";
+import { canSeeCostData, requireBankAndProfit } from "@/lib/experience";
 
 /* GET /api/finance/dashboard?period=week|quarter|year
+ *
+ * ACCESS: Finance, then «Bank & Profit» (src/lib/experience) — this feed IS
+ * profit and cash, and the intelligence screen's alert engines read it as
+ * fact, so a caller without the right gets a 403 rather than zeros. Supplier
+ * cost follows the private-records switch: without it total_supplier_cost
+ * and paid_supplier go out as 0 with kpi.cost_hidden. Guarded by
+ * validate:finance-perf §G.
  *
  * Returns a fully-computed KPI snapshot for the chosen period plus a
  * trend series suitable for a sparkline / mini-chart. All numbers are
@@ -56,6 +65,8 @@ export async function GET(req: Request) {
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
+  const denied = await requireBankAndProfit(auth, "The finance dashboard's figures");
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const periodParam = (url.searchParams.get("period") ?? "quarter") as DashboardPeriod;
@@ -73,7 +84,40 @@ export async function GET(req: Request) {
   /* Pull the rows we need for both the current and previous windows in
      parallel. Keep the column selection tight — we only need amounts
      and dates for aggregations. */
-  const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes] = await Promise.all([
+  /* Everything that does not depend on the period rows is started here and
+     awaited where it is used, so the request is two round trips deep (the
+     per-order aggregates need the period's order ids), not six. */
+  const today = new Date().toISOString().slice(0, 10);
+  const pointInTime = Promise.all([
+    supabaseServer
+      .from("finance_orders")
+      .select("id, selling_price, payment_status")
+      .eq("tenant_id", auth.tenant_id)
+      .neq("payment_status", "paid"),
+    supabaseServer
+      .from("finance_payments")
+      .select("linked_order_id, amount, direction, status")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("direction", "in")
+      .eq("status", "completed"),
+    supabaseServer
+      .from("finance_order_suppliers")
+      .select("supplier_cost, paid_amount")
+      .eq("tenant_id", auth.tenant_id),
+    supabaseServer
+      .from("finance_expenses")
+      .select("amount, payment_status")
+      .eq("tenant_id", auth.tenant_id)
+      .neq("payment_status", "paid"),
+  ]);
+  const remindersP = supabaseServer
+    .from("finance_notifications")
+    .select("status, due_date")
+    .eq("tenant_id", auth.tenant_id)
+    .in("status", ["scheduled", "snoozed"]);
+  const bankGapsP = bankLedgerBalances(auth.tenant_id).catch(() => new Map());
+
+  const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes, suppliersPrevRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
       .select("id, order_no, customer_name, currency, selling_price, tax_refund_value, financial_charges, order_date, payment_status")
@@ -88,38 +132,45 @@ export async function GET(req: Request) {
       .lte("order_date", prevEndISO),
     supabaseServer
       .from("finance_expenses")
-      .select("amount, expense_date, payment_status")
+      .select("id, amount, expense_date, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("expense_date", startISO)
       .lte("expense_date", endISO),
     supabaseServer
       .from("finance_expenses")
-      .select("amount")
+      .select("id, amount, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("expense_date", prevStartISO)
       .lte("expense_date", prevEndISO),
     supabaseServer
       .from("finance_payments")
-      .select("amount, direction, payment_date, status")
+      .select("amount, direction, payment_date, status, linked_expense_id")
       .eq("tenant_id", auth.tenant_id)
       .eq("status", "completed")
       .gte("payment_date", startISO)
       .lte("payment_date", endISO),
     supabaseServer
       .from("finance_payments")
-      .select("amount, direction")
+      .select("amount, direction, linked_expense_id")
       .eq("tenant_id", auth.tenant_id)
       .eq("status", "completed")
       .gte("payment_date", prevStartISO)
       .lte("payment_date", prevEndISO),
-    /* Supplier costs from orders within the current window — joined to
-       limit to recent orders only, matching the revenue window. */
+    /* Supplier costs from orders within each window — joined to limit to
+       the same orders the revenue figure counts, so gross profit and its
+       delta compare like with like. */
     supabaseServer
       .from("finance_order_suppliers")
       .select("supplier_cost, order_id, finance_orders!inner(order_date,tenant_id)")
       .eq("tenant_id", auth.tenant_id)
       .gte("finance_orders.order_date", startISO)
       .lte("finance_orders.order_date", endISO),
+    supabaseServer
+      .from("finance_order_suppliers")
+      .select("supplier_cost, finance_orders!inner(order_date,tenant_id)")
+      .eq("tenant_id", auth.tenant_id)
+      .gte("finance_orders.order_date", prevStartISO)
+      .lte("finance_orders.order_date", prevEndISO),
   ]);
 
   if (ordersRes.error || expensesRes.error || paymentsRes.error) {
@@ -139,13 +190,14 @@ export async function GET(req: Request) {
   const payments = paymentsRes.data ?? [];
   const paymentsPrev = paymentsPrevRes.data ?? [];
   const supplierCosts = suppliersRes.data ?? [];
+  const supplierCostsPrev = suppliersPrevRes.data ?? [];
 
   const total_revenue = orders.reduce((s, o) => s + (Number(o.selling_price) || 0), 0);
   const total_revenue_prev = ordersPrev.reduce((s, o) => s + (Number(o.selling_price) || 0), 0);
-  const total_supplier_cost = supplierCosts.reduce(
-    (s, x) => s + (Number((x as { supplier_cost: number | string }).supplier_cost) || 0),
-    0,
-  );
+  const sumSupplierCost = (rows: unknown[]) =>
+    rows.reduce<number>((s, x) => s + (Number((x as { supplier_cost: number | string }).supplier_cost) || 0), 0);
+  const total_supplier_cost = sumSupplierCost(supplierCosts);
+  const total_supplier_cost_prev = sumSupplierCost(supplierCostsPrev);
   const total_expenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const total_expenses_prev = expensesPrev.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const total_tax_refund = orders.reduce(
@@ -172,8 +224,7 @@ export async function GET(req: Request) {
   const gross_profit = total_revenue - total_supplier_cost;
   const net_profit =
     gross_profit - total_expenses + total_tax_refund - total_financial_charges;
-  const gross_profit_prev =
-    total_revenue_prev - 0; /* prev supplier cost not loaded — gross delta is approximate */
+  const gross_profit_prev = total_revenue_prev - total_supplier_cost_prev;
   const net_profit_prev =
     gross_profit_prev - total_expenses_prev + total_tax_refund_prev - total_financial_charges_prev;
 
@@ -189,22 +240,21 @@ export async function GET(req: Request) {
      payment_status='paid' is a common shortcut for "I paid this from
      petty cash / company card / etc." and we want it reflected in
      Cash Out without forcing the operator to also create a payment
-     row. Same treatment in the previous-window number so the delta
-     stays apples-to-apples. */
-  const cash_out_payments = payments
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out_paid_expenses = expenses
-    .filter((e) => (e as { payment_status: string }).payment_status === "paid")
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const cash_out = cash_out_payments + cash_out_paid_expenses;
-  const cash_out_payments_prev = paymentsPrev
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out_paid_expenses_prev = expensesPrev
-    .filter((e) => (e as { payment_status?: string }).payment_status === "paid")
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const cash_out_prev = cash_out_payments_prev + cash_out_paid_expenses_prev;
+     row. An expense that DOES have a completed payment row is counted
+     once, through the payment. Same treatment in the previous-window
+     number so the delta stays apples-to-apples. */
+  type PayRow = { direction: string; amount: number | string; linked_expense_id?: string | null };
+  type ExpRow = { id: string; amount: number | string; payment_status?: string };
+  const cashOutOf = (pays: PayRow[], exps: ExpRow[]) => {
+    const paidViaPayment = new Set(pays.filter((p) => p.direction === "out" && p.linked_expense_id).map((p) => p.linked_expense_id as string));
+    const outPayments = pays.filter((p) => p.direction === "out").reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const paidExpenses = exps
+      .filter((e) => e.payment_status === "paid" && !paidViaPayment.has(e.id))
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    return outPayments + paidExpenses;
+  };
+  const cash_out = cashOutOf(payments as PayRow[], expenses as ExpRow[]);
+  const cash_out_prev = cashOutOf(paymentsPrev as PayRow[], expensesPrev as ExpRow[]);
 
   /* ── Accounts Receivable & Accounts Payable ──
      Point-in-time, not window-based.
@@ -216,28 +266,7 @@ export async function GET(req: Request) {
 
      AP — sum of (supplier_cost − paid_amount) across all order
      supplier lines + unpaid expense amounts. (Already correct.) */
-  const [arOrdersRes, arPaymentsRes, apOrderSuppliersRes, apExpensesRes] = await Promise.all([
-    supabaseServer
-      .from("finance_orders")
-      .select("id, selling_price, payment_status")
-      .eq("tenant_id", auth.tenant_id)
-      .neq("payment_status", "paid"),
-    supabaseServer
-      .from("finance_payments")
-      .select("linked_order_id, amount, direction, status")
-      .eq("tenant_id", auth.tenant_id)
-      .eq("direction", "in")
-      .eq("status", "completed"),
-    supabaseServer
-      .from("finance_order_suppliers")
-      .select("supplier_cost, paid_amount")
-      .eq("tenant_id", auth.tenant_id),
-    supabaseServer
-      .from("finance_expenses")
-      .select("amount, payment_status")
-      .eq("tenant_id", auth.tenant_id)
-      .neq("payment_status", "paid"),
-  ]);
+  const [arOrdersRes, arPaymentsRes, apOrderSuppliersRes, apExpensesRes] = await pointInTime;
 
   /* AR — pair each unpaid order with its completed in-payments and
      subtract. max(0, …) so over-payments don't drag AR negative. */
@@ -413,12 +442,7 @@ export async function GET(req: Request) {
     return s + (Number(row.selling_price) || 0) * 0; /* placeholder, computed below */
   }, 0);
   /* Simple count of reminders we hold today flagged critical / urgent */
-  const today = new Date().toISOString().slice(0, 10);
-  const sevSel = await supabaseServer
-    .from("finance_notifications")
-    .select("status, due_date")
-    .eq("tenant_id", auth.tenant_id)
-    .in("status", ["scheduled", "snoozed"]);
+  const sevSel = await remindersP;
   const critical_reminders = (sevSel.data ?? []).filter((n) => {
     const due = (n as { due_date: string }).due_date;
     if (due >= today) return false;
@@ -426,6 +450,12 @@ export async function GET(req: Request) {
     return overdueDays > 7;
   }).length;
   const gross_margin_pct = total_revenue > 0 ? (gross_profit / total_revenue) * 100 : 0;
+
+  /* Daily bank check: every account's ledger figure against the statement
+     balance the operator holds. A gap is the first thing a manager should
+     hear about, before any profit number. */
+  const bankGaps = Array.from((await bankGapsP).values())
+    .filter((b) => Math.abs(b.difference) >= 0.01);
 
   const health_reasons: string[] = [];
   let health_status: "healthy" | "watch" | "stress" | "unknown" = "healthy";
@@ -449,6 +479,10 @@ export async function GET(req: Request) {
     if (accounts_payable > accounts_receivable * 1.5 && health_status === "healthy") {
       health_status = "watch";
       health_reasons.push("Outstanding payables significantly outpace receivables.");
+    }
+    if (bankGaps.length > 0) {
+      if (health_status === "healthy") health_status = "watch";
+      health_reasons.push(`${bankGaps.length} bank account${bankGaps.length === 1 ? "" : "s"} where the books differ from the statement.`);
     }
     if (health_status === "healthy") {
       health_reasons.push("Profit positive, cash flowing, no critical overdue items.");
@@ -494,6 +528,14 @@ export async function GET(req: Request) {
     top_expense_categories,
     expected_vs_realized,
   };
+  /* Supplier cost follows the private-records switch. (Profit is visible
+     here by definition, so a determined reader can still subtract — the
+     same holds for anyone shown revenue and gross profit together.) */
+  if (!canSeeCostData(auth)) {
+    out.total_supplier_cost = 0;
+    out.expected_vs_realized = { ...out.expected_vs_realized, paid_supplier: 0 };
+    out.cost_hidden = true;
+  }
 
   return NextResponse.json({ kpi: out }, {
     headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },

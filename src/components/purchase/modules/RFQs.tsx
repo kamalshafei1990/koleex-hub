@@ -4,9 +4,9 @@
    send an RFQ to one or more vendors so they can quote. Once the
    supplier responds with a price, the RFQ converts into a PO. */
 
-import { useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
+import { useMemo } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, supplierNames, usePurchaseList } from "../shared";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -27,29 +27,9 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function RFQsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<RFQ[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=rfqs", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { rows: [], suppliers: [] }) as {
-        rows: RFQ[];
-        suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-      };
-      if (cancelled) return;
-      setRows(data.rows);
-      const m = new Map<string, string>();
-      for (const c of data.suppliers) {
-        m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-      }
-      setSupplierName(m);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{ rows: RFQ[]; suppliers: SupplierRef[] }>("rfqs");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

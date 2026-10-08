@@ -1,0 +1,817 @@
+{
+ "section": "packaging",
+ "items": {
+  "rigid-lid-and-base-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small (pen, cufflinks) · medium (notebook set) · large (hamper) · A4 document box · custom to the product"
+    },
+    {
+     "k": "Board",
+     "v": "Greyboard 1.5–2 mm wrapped in 157 g/m² paper"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    },
+    {
+     "k": "Band",
+     "v": "A silver band (Pantone 877 C or silver foil paper) around gift boxes (ch. 124)"
+    },
+    {
+     "k": "Insert",
+     "v": "EVA foam cut to the product · card insert · velvet tray · crinkle paper"
+    }
+   ],
+   "logo": "The full logo in white, top-left of the lid (top-right in Arabic, never mirrored), 40 mm on a medium box — 30 mm minimum for deboss / foil (ch. 39).",
+   "do": [
+    "Black box, white logo, silver band — the house gift box (ch. 124)",
+    "A thank-you card inside, handwritten"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Glossy lamination or spot UV",
+    "Seasonal colours on the box — it stays black and white"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "magnetic-book-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium · large"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    },
+    {
+     "k": "Closure",
+     "v": "Hidden magnets in the flap"
+    },
+    {
+     "k": "Insert",
+     "v": "EVA foam cut to the product · card insert · velvet tray · crinkle paper"
+    }
+   ],
+   "logo": "The full logo in white, top-left of the lid (top-right in Arabic, never mirrored), 40 mm on a medium box — 30 mm minimum for deboss / foil (ch. 39). The inside of the flap may carry the group lockup in white (ch. 43).",
+   "do": [
+    "Premium gifts that open like a book"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Visible magnets or metal fittings"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "drawer-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    },
+    {
+     "k": "Pull",
+     "v": "Black ribbon pull or a thumb notch"
+    }
+   ],
+   "logo": "White, centred on the sleeve, 30 mm or wider.",
+   "do": [
+    "Small premium gifts and sample sets"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Coloured pulls"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "tube-cylinder-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small tea tube · tall bottle tube · poster tube"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    }
+   ],
+   "logo": "White, once along the tube, 40–60 mm, reading bottom to top on a tall tube; on the lid 30 mm.",
+   "do": [
+    "Scarves, tea, posters, bottles"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "The logo wrapped round the tube (it must read whole)"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "foldable-rigid-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Medium · large"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    },
+    {
+     "k": "Closing",
+     "v": "Magnet · ribbon"
+    },
+    {
+     "k": "Use",
+     "v": "Shipped flat, opened on site: exhibitions and abroad"
+    }
+   ],
+   "logo": "The full logo in white, top-left of the lid (top-right in Arabic, never mirrored), 40 mm on a medium box — 30 mm minimum for deboss / foil (ch. 39).",
+   "do": [
+    "Test folding and unfolding ten times on the sample"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "window-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium"
+    },
+    {
+     "k": "Window",
+     "v": "Clear PET or frosted, on the front, clear of the logo by 1 x"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    }
+   ],
+   "logo": "White, 30 mm or wider, above or beside the window — never on the film.",
+   "do": [
+    "Products that should be seen"
+   ],
+   "dont": [
+    "Printing the logo on the window film",
+    "Silver or gold foil on the logo — silver is for words and the band"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "tray-and-sleeve-box": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium · large"
+    },
+    {
+     "k": "Sleeve",
+     "v": "Black with the white logo (standard) · white with the black logo"
+    },
+    {
+     "k": "Tray",
+     "v": "Plain black or kraft"
+    }
+   ],
+   "logo": "The full logo centred on the sleeve, 40 mm, white (black on white).",
+   "do": [
+    "Low-cost gift sets and kits"
+   ],
+   "dont": [
+    "A silver logo on the sleeve (the workshop's \"black with silver logo\" becomes white)"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "wooden-box": {
+   "specs": [
+    {
+     "k": "Wood",
+     "v": "Black-stained (standard) · natural"
+    },
+    {
+     "k": "Logo",
+     "v": "Laser engraving in the wood's own tone"
+    },
+    {
+     "k": "Insert",
+     "v": "EVA foam · card · velvet tray · crinkle paper"
+    }
+   ],
+   "logo": "Laser, centred on the lid, 40 mm (wood 25 mm minimum, ch. 39).",
+   "do": [
+    "Machine models and VIP sets"
+   ],
+   "dont": [
+    "Metal plates with the logo glued on",
+    "Gold, chrome or silver-look plates"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "tin-box": {
+   "specs": [
+    {
+     "k": "Shapes",
+     "v": "Round · square · rectangle"
+    },
+    {
+     "k": "Finish",
+     "v": "Matte black with white print (standard) · brushed steel with black print"
+    },
+    {
+     "k": "Print",
+     "v": "Words and the band may be silver; the logo stays white or black"
+    }
+   ],
+   "logo": "Printed on the lid, centred, 30–40 mm; 20 mm minimum.",
+   "do": [
+    "Food-grade coating for tea and sweets"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Embossed chrome logos"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "small-boxes": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Pillow box · small cube box · envelope box · clamshell"
+    },
+    {
+     "k": "Outside",
+     "v": "Black soft-touch or matte black paper (standard) · textured black · white with black print (second version) · kraft (eco)"
+    },
+    {
+     "k": "Logo method",
+     "v": "White foil · blind deboss or emboss · white screen print — black foil on white; never silver foil on the logo, never spot UV"
+    }
+   ],
+   "logo": "White, 25–30 mm, centred; leave it off a box too small for 25 mm.",
+   "do": [
+    "Pins, USB drives, keyrings, badges"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "The K alone on a small box"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39,
+    47
+   ]
+  },
+  "paper-carrier-bags": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small 18 × 8 × 22 cm · medium 25 × 10 × 32 cm · large 32 × 12 × 42 cm · extra large 45 × 15 × 45 cm · A4 document bag · landscape A4 bag"
+    },
+    {
+     "k": "Fairs",
+     "v": "Black art paper, black rope handles, white print — the group lockup centred (ch. 123)"
+    },
+    {
+     "k": "VIP",
+     "v": "Black soft-touch art paper, black ribbon handles, white foil — the group lockup centred, the website small at the bottom (ch. 123)"
+    },
+    {
+     "k": "Other papers",
+     "v": "White art paper, matte (second version) · kraft (eco)"
+    },
+    {
+     "k": "Handles",
+     "v": "Cotton rope · satin ribbon (VIP) · twisted paper · flat paper"
+    }
+   ],
+   "logo": "The group lockup (ch. 43) centred on both faces, from the lockup file; on a small bag the full logo 60 mm.",
+   "do": [
+    "Fair bags and VIP bags as the book sets them",
+    "Reinforced base card in large bags"
+   ],
+   "dont": [
+    "Colours, pictures or product photos on bags",
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Slogans"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    123,
+    43,
+    47
+   ]
+  },
+  "non-woven-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Flat bag with handles · bag with gusset · drawstring"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Print",
+     "v": "Screen print white: the full logo; the booth number under it on exhibition bags"
+    }
+   ],
+   "logo": "The full logo 120–150 mm, centred, white.",
+   "do": [
+    "Hundreds a day at exhibitions — order from one approved sample"
+   ],
+   "dont": [
+    "The event's colours or the organiser's logo next to ours"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "fabric-pouches": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Velvet drawstring pouch · cotton drawstring pouch · felt pouch · dust bag for leather goods"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Logo",
+     "v": "White print or a woven label (25 mm minimum)"
+    }
+   ],
+   "logo": "The full logo, 30–40 mm, centred; woven label 25 mm.",
+   "do": [
+    "Small gifts, dust bags for leather items"
+   ],
+   "dont": [
+    "A silver-printed logo (the workshop's \"silver print\" becomes white)"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39
+   ]
+  },
+  "exhibition-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Brochure bag with shoulder strap · catalogue envelope bag · clear PVC bag (sample display)"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    }
+   ],
+   "logo": "The full logo 120–150 mm, centred; on clear PVC, white print 60 mm.",
+   "do": [
+    "Big enough for the A4 catalogue"
+   ],
+   "dont": [
+    "The booth number larger than the logo"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "tissue-paper": {
+   "specs": [
+    {
+     "k": "Print",
+     "v": "Plain black · black with the KOLEEX pattern in grey · white with the pattern in light grey"
+    },
+    {
+     "k": "Paper",
+     "v": "17 g/m² acid-free tissue"
+    }
+   ],
+   "logo": "No logo on the tissue itself — the pattern only; the logo is on the box and the seal sticker.",
+   "do": [
+    "Fold twice round the product; close with the round seal sticker"
+   ],
+   "dont": [
+    "The K alone as a pattern or a mark (owner, 30/09/2026) — the workshop's K patterns become the KOLEEX pattern (ch. 57)",
+    "Silver print on the tissue"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    57,
+    40
+   ]
+  },
+  "wrapping-paper": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black matte with the full logo repeated in white, small · kraft with the black logo · seasonal designs (Occasions)"
+    },
+    {
+     "k": "Repeat",
+     "v": "The full logo 30 mm, spaced by 3 x, straight rows"
+    }
+   ],
+   "logo": "Repeated full logo, 30 mm, white on black, never rotated.",
+   "do": [
+    "Wrap with a black ribbon"
+   ],
+   "dont": [
+    "A silver logo repeat (white instead)",
+    "The K alone as a pattern or a mark (owner, 30/09/2026)",
+    "Rotated or tilted repeats"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39,
+    40
+   ]
+  },
+  "ribbons": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Satin · grosgrain · organza"
+    },
+    {
+     "k": "Widths",
+     "v": "10 mm · 25 mm · 38 mm"
+    },
+    {
+     "k": "Colours",
+     "v": "Plain black (standard) · black with the logo in white · silver ribbon with the logo in black"
+    }
+   ],
+   "logo": "On a 25 or 38 mm ribbon, the full logo 20–25 mm, repeated every 150 mm; plain on 10 mm.",
+   "do": [
+    "Black on gift boxes; silver ribbon only with the black logo"
+   ],
+   "dont": [
+    "A silver logo on a black ribbon",
+    "Coloured ribbons"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39,
+    124
+   ]
+  },
+  "gift-tags-and-cards": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Hang tag with string · flat gift card in the box · thank-you card insert · QR card to a video message"
+    },
+    {
+     "k": "Finish",
+     "v": "Black card 350 g/m², the white logo, words in silver foil · white card, black print"
+    },
+    {
+     "k": "QR",
+     "v": "Black on white, 20 mm minimum, tested on two phones (ch. 104)"
+    }
+   ],
+   "logo": "White, 25 mm, top or centre.",
+   "do": [
+    "Every gift says who it is from — a handwritten line and a real signature (ch. 124)"
+   ],
+   "dont": [
+    "Printed signatures",
+    "Silver or gold foil on the logo — silver is for words and the band"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    104,
+    39
+   ]
+  },
+  "seals-and-closures": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Round seal sticker 40 mm · belly band / sleeve · wax seal (VIP) · black elastic band"
+    },
+    {
+     "k": "Sticker",
+     "v": "Black matte, the full logo white"
+    },
+    {
+     "k": "Wax",
+     "v": "Black or silver wax, the full logo in the seal"
+    }
+   ],
+   "logo": "The full logo, 25 mm on the 40 mm seal, centred with 1 x clear space.",
+   "do": [
+    "Close tissue and boxes with the round seal"
+   ],
+   "dont": [
+    "The logo inside a badge or seal border (ch. 40) — the seal sticker is plain round",
+    "The K alone as a pattern or a mark (owner, 30/09/2026)"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    40,
+    41,
+    39
+   ]
+  },
+  "fillers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black crinkle paper · honeycomb paper (eco) · tissue only"
+    }
+   ],
+   "logo": "No logo on fillers.",
+   "do": [
+    "Black crinkle in black boxes, honeycomb for shipping"
+   ],
+   "dont": [
+    "Plastic foam peanuts or coloured shred"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    47
+   ]
+  },
+  "mailer-boxes": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium · large"
+    },
+    {
+     "k": "Print",
+     "v": "Black outside with the logo inside the lid · kraft outside with the black logo · printed inside with a message"
+    },
+    {
+     "k": "Material",
+     "v": "Corrugated E-flute · rigid-look mailer"
+    },
+    {
+     "k": "Carton print",
+     "v": "One-colour flexo, black; 60 mm minimum on a carton (ch. 110)"
+    }
+   ],
+   "logo": "Outside: 60 mm, one colour; inside the lid: the full logo white, 80–100 mm, centred.",
+   "do": [
+    "The unboxing moment inside, a plain outside for the courier"
+   ],
+   "dont": [
+    "Colour printing on shipping cartons",
+    "Silver or gold foil on the logo — silver is for words and the band"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    110,
+    39
+   ]
+  },
+  "sample-boxes": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Clear-lid sample box · compartment box for small parts · fabric sample folder"
+    },
+    {
+     "k": "Label",
+     "v": "60 × 40 mm label: the logo 30 mm, the item code in monospace, the QR (ch. 112)"
+    }
+   ],
+   "logo": "On the label, 30 mm, black on white.",
+   "do": [
+    "Codes printed from the Hub"
+   ],
+   "dont": [
+    "Handwritten codes",
+    "The supplier's own labels left on"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    112,
+    53
+   ]
+  },
+  "courier-packaging": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Courier plastic bag with the logo · padded envelope · document tube"
+    },
+    {
+     "k": "Colours",
+     "v": "White or grey bag with black print; black tube with white print"
+    },
+    {
+     "k": "Note",
+     "v": "Machine and spare-part cartons live in Product packaging"
+    }
+   ],
+   "logo": "60 mm, top-left, one colour.",
+   "do": [
+    "Return address in 7 pt"
+   ],
+   "dont": [
+    "Colour or pictures on shipping material"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    110,
+    39
+   ]
+  },
+  "food-gift-boxes": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Dates box · mooncake box · chocolate box · cookie tin · sweet box (Egyptian kahk / ma'amoul)"
+    },
+    {
+     "k": "Finish",
+     "v": "Black, the white logo, a silver band; seasonal editions in Occasions"
+    },
+    {
+     "k": "Food",
+     "v": "Food-grade inner tray; halal certificates for Muslim markets"
+    }
+   ],
+   "logo": "The full logo in white, top-left of the lid (top-right in Arabic, never mirrored), 40 mm on a medium box — 30 mm minimum for deboss / foil (ch. 39).",
+   "do": [
+    "The greeting of the season in silver foil, in the partner's language (ch. 124)"
+   ],
+   "dont": [
+    "Seasonal colours on the box",
+    "Silver or gold foil on the logo — silver is for words and the band",
+    "Alcohol"
+   ],
+   "vendor": "Send the dieline and the master vector file as PDF/X-1a (CMYK, 3 mm bleed, fonts outlined, the foil and deboss on their own named layers). Approve a physical sample with the real paper, foil and insert before the order — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    124,
+    39
+   ]
+  },
+  "tea-and-coffee-packaging": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Tea tin / caddy · tea bag envelopes · coffee bag with valve · drip coffee sachets"
+    },
+    {
+     "k": "Finish",
+     "v": "Matte black with white print (standard) · white with black print"
+    },
+    {
+     "k": "Words",
+     "v": "The blend's name may be silver; the logo stays white or black"
+    }
+   ],
+   "logo": "30 mm on tins and bags, 20 mm on sachets and envelopes; leave it off anything smaller.",
+   "do": [
+    "Food-grade materials, dates DD/MM/YYYY"
+   ],
+   "dont": [
+    "Silver or gold foil on the logo — silver is for words and the band"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39,
+    26
+   ]
+  },
+  "water-bottle-labels": {
+   "specs": [
+    {
+     "k": "Bottles",
+     "v": "330 ml · 500 ml · glass bottle (VIP)"
+    },
+    {
+     "k": "Designs",
+     "v": "Standard label · event edition · seasonal label · customer's name label (VIP visit)"
+    },
+    {
+     "k": "Label",
+     "v": "Wrap-around, black with the white logo 30 mm; the event's name or the guest's name in Inter under it"
+    },
+    {
+     "k": "Material",
+     "v": "Waterproof BOPP, matte"
+    }
+   ],
+   "logo": "The full logo 30 mm, centred on the front panel, white on black.",
+   "do": [
+    "Change the edition per event; spell the guest's name as on their card"
+   ],
+   "dont": [
+    "The bottler's own brand left visible",
+    "Colours from the event"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39,
+    123
+   ]
+  },
+  "hospitality-items": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Paper napkins · coffee cup sleeves · stir sticks · candy wrappers · cake / cupcake boxes · sugar sticks"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    }
+   ],
+   "logo": "The full logo at the method's minimum (20 mm pad print, 25 mm print); leave it off stir sticks and sugar sticks too small for it.",
+   "do": [
+    "Booths, meeting rooms, events"
+   ],
+   "dont": [
+    "Slogans or patterns of logos",
+    "The K alone as a pattern or a mark (owner, 30/09/2026)"
+   ],
+   "vendor": "Send the logo from the master vector file only. Approve a physical sample before the order (ch. 134); check the logo's size, colour and place on delivery.",
+   "book": [
+    39,
+    41
+   ]
+  }
+ }
+}

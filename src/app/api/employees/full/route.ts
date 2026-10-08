@@ -20,8 +20,10 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { activateChecklist } from "@/lib/server/hr-lifecycle";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { historyRow } from "@/lib/management/position-history";
 import { hashForWrite } from "@/lib/server/password";
 
 /* ── Table names ── */
@@ -387,6 +389,9 @@ export async function POST(req: Request) {
   const { data: employee, error: empErr } = await supabaseServer
     .from(EMPLOYEES)
     .insert({
+      /* Stamp the caller's tenant so the wizard-created row is scoped from
+         birth (previously omitted → NULL tenant → visible to every tenant). */
+      tenant_id: auth.tenant_id,
       person_id: person.id,
       account_id: null,
       employee_number: employeeNumber,
@@ -400,6 +405,7 @@ export async function POST(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       notes: null,
       /* Identity consolidation: home address lives on the person record
@@ -465,6 +471,10 @@ export async function POST(req: Request) {
     );
   }
 
+  /* ── Step 3a: the onboarding checklist starts on the hire date (Phase F;
+     non-fatal, idempotent — HR no longer has to remember to assign it) ── */
+  await activateChecklist(employee.id, "onboarding", str(body, "hire_date") || new Date().toISOString().slice(0, 10), str(body, "department_id"));
+
   /* ── Step 3b: Skill assessments (non-fatal — the hire is already real) ── */
   if (body.skills !== undefined) {
     const skillErr = await saveSkillAssessments(auth.tenant_id, employee.id, body.skills, auth.account_id ?? null);
@@ -497,16 +507,13 @@ export async function POST(req: Request) {
     );
   }
 
-  /* ── Step 5: Position History ── */
-  await supabaseServer.from(HISTORY).insert({
-    position_id: positionId,
-    person_id: person.id,
-    department_id: departmentId,
-    action: "assigned",
-    from_position_id: null,
-    to_position_id: positionId,
-    notes: "Initial assignment on hire",
-  });
+  /* ── Step 5: Position History ── the table's own columns
+     (lib/management/position-history); a failure is loud, never the hire's. */
+  const { error: histErr } = await supabaseServer.from(HISTORY).insert(historyRow({
+    action: "assigned", personId: person.id, departmentId, toPositionId: positionId,
+    notes: "Initial assignment on hire", changedBy: auth.account_id ?? null,
+  }));
+  if (histErr) console.error("[api/employees/full POST history]", histErr.message);
 
   /* ── Step 6 (Optional): Account ── */
   let accountId: string | null = null;
@@ -660,10 +667,16 @@ export async function PUT(req: Request) {
   /* ── Resolve the record we're editing ── */
   const { data: existing, error: exErr } = await supabaseServer
     .from(EMPLOYEES)
-    .select("id, person_id")
+    .select("id, person_id, employment_status, tenant_id")
     .eq("id", employeeId)
     .maybeSingle();
-  if (exErr || !existing?.person_id) {
+  if (
+    exErr ||
+    !existing?.person_id ||
+    /* Tenant scope: a scoped row from another tenant must 404, never be
+       edited. NULL (legacy) rows stay in-tenant. */
+    (auth.tenant_id && existing.tenant_id && existing.tenant_id !== auth.tenant_id)
+  ) {
     return NextResponse.json({ success: false, error: "Employee not found." }, { status: 404 });
   }
   const personId = existing.person_id as string;
@@ -793,6 +806,7 @@ export async function PUT(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       emergency_contact_name: str(body, "emergency_contact_name"),
       emergency_contact_phone: str(body, "emergency_contact_phone"),
@@ -846,6 +860,15 @@ export async function PUT(req: Request) {
       emergency_contact2_relationship: str(body, "emergency_contact2_relationship"),
     })
     .eq("id", employeeId);
+
+  /* ── Phase F: leaving → the offboarding checklist starts today (once). ── */
+  {
+    const nextStatus = str(body, "employment_status") || "active";
+    const prevStatus = (existing as { employment_status?: string | null }).employment_status ?? "active";
+    if (nextStatus === "terminated" && prevStatus !== "terminated") {
+      await activateChecklist(employeeId, "offboarding", new Date().toISOString().slice(0, 10), str(body, "department_id"));
+    }
+  }
   if (empErr) {
     return NextResponse.json(
       { success: false, error: `Failed to update employee: ${empErr.message}` },
@@ -889,16 +912,14 @@ export async function PUT(req: Request) {
           { status: 500 },
         );
       }
-      await supabaseServer.from(HISTORY).insert({
-        position_id: positionId,
-        person_id: personId,
-        department_id: departmentId,
-        action: current ? "transferred" : "assigned",
-        from_position_id: current?.position_id ?? null,
-        to_position_id: positionId,
-        effective_date: new Date().toISOString().split("T")[0],
-        notes: "Updated via employee form",
-      });
+      /* The table has no effective_date (the insert that named one never
+         landed): the row's created_at is when the move was made. */
+      const { error: histErr } = await supabaseServer.from(HISTORY).insert(historyRow({
+        action: current ? "transferred" : "assigned", personId, departmentId,
+        fromPositionId: current?.position_id ?? null, toPositionId: positionId,
+        notes: "Updated via employee form", changedBy: auth.account_id ?? null,
+      }));
+      if (histErr) console.error("[api/employees/full PATCH history]", histErr.message);
     }
   }
 

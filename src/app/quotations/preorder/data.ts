@@ -1,16 +1,19 @@
-// Preorder sample data — transcribed faithfully from the customer's
+// Preorder SAMPLE data — transcribed faithfully from one customer's
 // "PREORDER COLEEX.xlsx" (KOLEEX ORDER). One customer, four sub-buyers, grouped
 // into category sections. `q` = quantities in buyer order [Hazem, Esmat, Allam,
 // Bayoumy]. Photo + Price are filled in the system (price is what we quote).
-// This is seed/preview data for the document design; persistence comes later.
+//
+// Reachable ONLY through the page's explicit "Load sample" action. A new
+// preorder starts empty: this is a real customer's order and it must not be
+// the default content of every document the team opens.
 
-export interface PreorderItem {
+interface PreorderItem {
   model: string;
   desc: string;
   q: [number, number, number, number];
   photo?: string | null;
 }
-export interface PreorderSection {
+interface PreorderSection {
   en: string;
   ar: string;
   items: PreorderItem[];

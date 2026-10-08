@@ -108,7 +108,7 @@ function parseInline(text: string, keyPrefix: string): InlineNode[] {
           href={safe}
           target="_blank"
           rel="noreferrer"
-          className="text-blue-300 underline decoration-blue-300/40 hover:decoration-blue-300 break-words"
+          className="text-[#567FB2] dark:text-[#7FA9D6] underline decoration-current/40 hover:decoration-current break-words"
         >
           {m[0]}
         </a>,
@@ -152,7 +152,7 @@ function parseFormatting(text: string, keyPrefix: string): InlineNode[] {
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="text-blue-300 underline decoration-blue-300/40 hover:decoration-blue-300 break-words"
+            className="text-[#567FB2] dark:text-[#7FA9D6] underline decoration-current/40 hover:decoration-current break-words"
           >
             {match[1]}
           </a>,
@@ -252,7 +252,7 @@ function renderWithMentions(
     out.push(
       <span
         key={`${keyPrefix}-mention-${counter++}`}
-        className="inline-flex items-center px-1 rounded bg-blue-500/15 text-blue-300 font-semibold"
+        className="inline-flex items-center px-1 rounded bg-[#567FB2]/15 text-[#567FB2] dark:text-[#7FA9D6] font-semibold"
       >
         @{m.username}
       </span>,

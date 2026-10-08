@@ -725,6 +725,10 @@ export async function createEmployee(
     });
     if (res.ok) {
       const json = (await res.json()) as { employee: EmployeeRow | null };
+      /* The roster rides the 15 s cachedGet window now — a successful
+         create must drop it or the new hire is invisible until expiry. */
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/employees");
       return json.employee;
     }
     if (res.status === 401 || res.status === 403) return null;
@@ -750,7 +754,11 @@ export async function updateEmployee(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    if (res.ok) return true;
+    if (res.ok) {
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/employees");
+      return true;
+    }
     if (res.status === 401 || res.status === 403 || res.status === 404) return false;
   } catch (e) {
     console.error("[Employees] updateEmployee failed:", e);
@@ -785,6 +793,8 @@ export async function upsertEmployeeByAccountId(
       return null;
     }
     const json = (await res.json()) as { employee: EmployeeRow | null };
+    const { invalidateCachedGet } = await import("@/lib/client-cache");
+    invalidateCachedGet("/api/employees");
     return json.employee;
   } catch (e) {
     console.error("[Employees] upsertByAccountId failed:", e);
@@ -863,6 +873,9 @@ async function updateAccountPreferencesNow(
     const res = await fetch("/api/accounts/" + id + "/preferences", {
       method: "PATCH",
       credentials: "include",
+      /* A save fired as the page goes away (Wallpaper flushes on pagehide)
+         must outlive it. Payloads are small; the route caps them at 32 KB. */
+      keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preferences }),
     });

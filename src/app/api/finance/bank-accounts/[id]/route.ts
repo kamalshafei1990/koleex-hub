@@ -7,6 +7,12 @@ import "server-only";
            summary, scoped to this account.
    PATCH — edit account fields. Currency change is gated when the
            account already has movements (treasury invariant).
+
+   The balances go only to «Bank & Profit» (src/lib/experience): anyone else
+   reads them as 0 with balances_hidden, and a PATCH from them — an edit form
+   sends the whole row back — never writes a balance. The movements stay:
+   they are the reconciliation work, not a balance.
+   Guarded by validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -19,9 +25,11 @@ import type {
   CashMovement,
   FinanceReconciliationCandidate,
 } from "@/lib/finance/types";
+import { BANK_BALANCE_INPUTS, canSeeBankAndProfit, hideBankBalances } from "@/lib/experience";
 
 export interface BankAccountDetailResponse {
   account: BankAccount;
+  visibility: { can_see_bank_balances: boolean };
   movements: CashMovement[];
   imports: BankStatementImport[];
   reconciliation: {
@@ -50,7 +58,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (deny) return deny;
   const { id } = await ctx.params;
 
-  const [acctRes, movRes, impRes, candRes] = await Promise.all([
+  const [acctRes, movRes, impRes, candRes, bankAndProfit] = await Promise.all([
     supabaseServer
       .from("finance_bank_accounts")
       .select("*")
@@ -76,6 +84,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       .from("finance_reconciliation_candidates")
       .select("id, cash_movement_id, status")
       .eq("tenant_id", auth.tenant_id),
+    canSeeBankAndProfit(auth),
   ]);
 
   if (!acctRes.data) {
@@ -110,7 +119,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const unreconciled_count = reconciliation.unreconciled;
 
   const body: BankAccountDetailResponse = {
-    account,
+    account: bankAndProfit ? account : hideBankBalances(account),
+    visibility: { can_see_bank_balances: bankAndProfit },
     movements,
     imports,
     reconciliation,
@@ -148,6 +158,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const body = (await req.json().catch(() => null)) as PatchBody | null;
   if (!body) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+
+  /* Can't read → can't write. A caller without «Bank & Profit» was sent the
+     balances as 0, and the edit form sends the whole row back — the fields
+     are dropped here, never written as zero. */
+  const bankAndProfit = await canSeeBankAndProfit(auth);
+  if (!bankAndProfit) for (const f of BANK_BALANCE_INPUTS) delete body[f];
 
   /* Load current row + count of movements to guard the currency edit. */
   const { data: existingRow } = await supabaseServer
@@ -219,5 +235,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       { status: 409 },
     );
   }
-  return NextResponse.json({ account: (data ?? existing) as BankAccount });
+  const saved = (data ?? existing) as BankAccount;
+  return NextResponse.json({ account: bankAndProfit ? saved : hideBankBalances(saved) });
 }

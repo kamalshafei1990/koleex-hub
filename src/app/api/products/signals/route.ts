@@ -1,48 +1,52 @@
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
-import { hasProductCostAccess, requireProductDataAction } from "@/lib/server/product-access";
-import { resolveSchema, computeReadiness } from "@/lib/product-schema";
-import type { ProductKnowledgeBlock } from "@/types/product-schema";
-
 /* ---------------------------------------------------------------------------
-   GET /api/products/signals — INTERNAL work signals for the Product Data
-   grid. One round-trip returning, per product id:
+   POST /api/products/signals — INTERNAL work signals for the Product Data
+   grid, for a LIST of product ids. Per product:
 
      readiness  — 0-100, the SAME computeReadiness engine the editor uses,
                   so the card and the detail page never disagree
      missing    — up to 3 actionable gap keys (photo/specs/cost/desc/code)
-     cost       — primary model cost in CNY (cost-permission gated)
+     cost       — effective cost in CNY (cost-permission gated)
      visible    — customers can see it (distinct from status)
      updatedAt  — staleness
-     supplier   — primary supplier {name, logo} (link first, else the
-                  model's supplier text matched by name)
+     supplier   — { id } into the `suppliers` dictionary, or { id: null,
+                  name } when the model row carries free text
 
-   Deliberately a SEPARATE endpoint, not extra weight on
-   /api/products?view=list: the public /products catalogue must keep its
-   slim, fast payload — only /product-data asks for signals.
+   WHY IDS, NOT THE WHOLE CATALOGUE (22 Sep 2026). The GET version read every
+   product, every model, every media row, every supplier link, every
+   translation and EVERY contact on every open, then shipped 408 KB back:
+   190 KB of signals (each carrying a full supplier object with a 200-byte
+   logo URL — the same eight suppliers, repeated 394 times), 158 KB of model
+   maps the list response already delivers with each page, and 60 KB of
+   thumbnails. That was for 394 products; at the owner's 3,000 it is ~3 MB
+   per open, and the grid only ever shows one page at a time. The list is
+   paged; this now follows the page. Same discipline as /api/products/
+   fob-prices: the client posts the ids it is holding and merges.
+
+   WHAT LEFT THE PAYLOAD, AND WHERE IT WENT:
+     · models (counts / codes / rosters) — ride with each list page.
+     · supplier objects — one `suppliers` dictionary per response; the
+       signal carries the id.
+     · every other per-product field is unchanged, so the card is unchanged.
+
+   COST SOURCE (owner's source-of-truth rule): the SUPPLIER LINK is the
+   record; the variant's cost_price is the fallback. The profile's Price tab
+   reads them in the same order — the GET version read the variant first,
+   and the same product could show "Not set" on one screen and ¥6,554 on
+   the other.
+
+   Deliberately a SEPARATE endpoint, not extra weight on /api/products: the
+   public /products catalogue must keep its slim, fast payload — only
+   /product-data asks for signals.
    --------------------------------------------------------------------------- */
 
 export const dynamic = "force-dynamic";
 
-interface ProductRow {
-  id: string;
-  division_slug: string | null;
-  category_slug: string | null;
-  subcategory_slug: string | null;
-  product_name: string | null;
-  schema_specs: Record<string, unknown> | null;
-  schema_knowledge: unknown[] | null;
-  excerpt: string | null;
-  description: string | null;
-  warranty: string | null;
-  moq: string | number | null;
-  lead_time: string | null;
-  visible: boolean | null;
-  updated_at: string | null;
-}
+import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/server/auth";
+import { hasProductCostAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { computeProductSignals } from "@/lib/server/product-signals";
 
-export async function GET() {
+export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   /* Work signals expose completeness + cost posture — Product Data only. */
@@ -50,307 +54,22 @@ export async function GET() {
   if (denied) return denied;
   const canSeeCosts = await hasProductCostAccess(auth);
 
-  const [prodRes, subRes, mediaRes, modelRes, supRes, linkRes, trRes] = await Promise.all([
-    supabaseServer
-      .from("products")
-      .select(
-        "id, division_slug, category_slug, subcategory_slug, product_name, schema_specs, schema_knowledge, excerpt, description, warranty, moq, lead_time, visible, updated_at",
-      ),
-    supabaseServer.from("subcategories").select("slug, code"),
-    supabaseServer
-      .from("product_media")
-      .select('product_id, type, url, "order"')
-      .order("order", { ascending: true }),
-    supabaseServer
-      .from("product_models")
-      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, visible, status, "order"')
-      .order("order", { ascending: true }),
-    /* Supplier directory — 145 rows, logo columns are URLs (verified: 0
-       base64), so shipping them in a bulk payload is safe. */
-    supabaseServer
-      .from("contacts")
-      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
-      .eq("contact_type", "supplier")
-      .eq("tenant_id", auth.tenant_id),
-    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options"),
-    /* Translated product names (中文/العربية) — the grid's search haystack
-       needs them so 熔接机 finds the fusing machine. Names only; nothing
-       cost-side rides on this query. */
-    supabaseServer.from("product_translations").select("product_id, product_name"),
-  ]);
+  let ids: string[] = [];
+  try {
+    const body = (await req.json()) as { ids?: unknown };
+    if (Array.isArray(body.ids)) {
+      ids = body.ids.filter((v): v is string => typeof v === "string" && v.length > 0);
+    }
+  } catch {
+    return NextResponse.json({ error: "invalid json body" }, { status: 400 });
+  }
 
-  if (prodRes.error) {
-    console.error("[api/products/signals]", prodRes.error.message);
+  const payload = await computeProductSignals(auth.tenant_id, ids, canSeeCosts);
+  if (!payload) {
     return NextResponse.json({ error: "Failed to load signals" }, { status: 500 });
   }
-
-  const subCode = new Map<string, string>();
-  for (const s of (subRes.data ?? []) as Array<{ slug: string | null; code: string | null }>) {
-    if (s.slug && s.code) subCode.set(s.slug, s.code);
-  }
-
-  /* media counts by product + type, plus the first main image per product.
-     The thumbnail map rides along because this endpoint already reads the
-     whole media table — see the round-trip note at the bottom. */
-  const media = new Map<string, { main: number; gallery: number; packing: number; manual: number; video: number }>();
-  const mainImages: Record<string, string> = {};
-  for (const m of (mediaRes.data ?? []) as Array<{ product_id: string; type: string; url: string | null }>) {
-    const b = media.get(m.product_id) ?? { main: 0, gallery: 0, packing: 0, manual: 0, video: 0 };
-    if (m.type === "main_image") {
-      b.main += 1;
-      if (m.url && !mainImages[m.product_id]) mainImages[m.product_id] = m.url;
-    }
-    else if (m.type === "gallery") b.gallery += 1;
-    else if (m.type === "packing") b.packing += 1;
-    else if (m.type === "manual") b.manual += 1;
-    else if (m.type === "video") b.video += 1;
-    media.set(m.product_id, b);
-  }
-
-  /* Supplier lookup — by id AND by every name variant, because most
-     products carry the supplier as free TEXT on the model rather than a
-     product_suppliers link (only a handful are linked today). */
-  interface SupLite { id: string | null; name: string; logo: string | null; cn: string | null }
-  const supById = new Map<string, SupLite>();
-  const supByName = new Map<string, SupLite>();
-  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
-  for (const c of (supRes.data ?? []) as Array<{
-    id: string;
-    company_name_en: string | null;
-    company_name_cn: string | null;
-    display_name: string | null;
-    photo_url: string | null;
-    logo_url: string | null;
-  }>) {
-    const name = c.company_name_en || c.display_name || c.company_name_cn || "";
-    if (!name) continue;
-    const lite: SupLite = { id: c.id, name, logo: c.photo_url || c.logo_url || null, cn: c.company_name_cn };
-    supById.set(c.id, lite);
-    for (const variant of [c.company_name_en, c.company_name_cn, c.display_name]) {
-      if (variant && variant.trim()) supByName.set(norm(variant), lite);
-    }
-  }
-  const linkedSupplier = new Map<string, string>();
-  /* Cost can be recorded in EITHER place: on the variant (Price tab) or on
-     the supplier link (Supplier tab). The grid only ever read the variant, so
-     a product priced through its supplier showed "Cost not set" and carried a
-     "No cost" gap chip while the cost was sitting right there on the record.
-     Primary link wins, else the first link with a figure. */
-  const linkCost = new Map<string, number>();
-  /* Price annotations ride with the cost so the CARD can show them. */
-  const linkNote = new Map<string, string>();
-  const linkExtras = new Map<string, { price: number | null; note: string }[]>();
-  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null; unit_cost_cny: number | string | null; notes?: string | null; price_options?: Array<{ price?: unknown; note?: unknown }> | null }>) {
-    const c = l.unit_cost_cny == null ? null : Number(l.unit_cost_cny);
-    if (c != null && Number.isFinite(c) && (l.is_primary || !linkCost.has(l.product_id))) {
-      linkCost.set(l.product_id, c);
-    }
-    if (l.is_primary || !linkNote.has(l.product_id)) {
-      if (l.notes && String(l.notes).trim()) linkNote.set(l.product_id, String(l.notes).trim());
-      if (Array.isArray(l.price_options) && l.price_options.length) {
-        linkExtras.set(l.product_id, l.price_options.map((o) => ({
-          price: o.price == null || o.price === "" ? null : Number(o.price),
-          note: String(o.note ?? "").trim(),
-        })).filter((o) => o.price !== null || o.note));
-      }
-    }
-    if (!l.supplier_id) continue;
-    if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
-  }
-
-  /* Model summary — the exact shape /api/product-models?summary=1 returns,
-     including its permission rule: supplier names are COST-side data and
-     only ship when the caller passes hasProductCostAccess. */
-  const counts: Record<string, number> = {};
-  const suppliersByProduct: Record<string, string[]> = {};
-  const supplierSet = new Set<string>();
-  const primaryModelNames: Record<string, string> = {};
-  /* EVERY model label per product, in order — the family chips on the card
-     and "find XF-600 even though it lives inside XF-450" both need the full
-     roster, not just the primary. ~700 short strings ≈ a few KB. */
-  const modelNamesByProduct: Record<string, string[]> = {};
-
-  /* first model per product (rows pre-sorted by order) */
-  const primary = new Map<
-    string,
-    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null; supplier: string | null; pricing_mode: string | null; price_note: string | null }
-  >();
-  for (const m of (modelRes.data ?? []) as Array<{
-    product_id: string;
-    primary_model: string | null;
-    model_name: string | null;
-    cost_price: number | null;
-    global_price: number | null;
-    supplier: string | null;
-    pricing_mode: string | null;
-    price_note: string | null;
-  }>) {
-    if (!primary.has(m.product_id)) primary.set(m.product_id, m);
-    counts[m.product_id] = (counts[m.product_id] || 0) + 1;
-    const label = m.primary_model?.trim() || m.model_name;
-    if (label && !primaryModelNames[m.product_id]) primaryModelNames[m.product_id] = label;
-    /* The roster advertises SELLABLE members (card chips, search).
-       Status inherits from the product; a member leaves the roster only
-       when someone manually discontinued or hid it. The profile and the
-       edit form still show every member — this is advertising, not the
-       record. */
-    const mv = m as unknown as { visible?: boolean | null; status?: string | null };
-    if (label && mv.visible !== false && mv.status !== "discontinued") {
-      if (!modelNamesByProduct[m.product_id]) modelNamesByProduct[m.product_id] = [];
-      if (!modelNamesByProduct[m.product_id].includes(label)) modelNamesByProduct[m.product_id].push(label);
-    }
-    if (canSeeCosts && m.supplier) {
-      if (!suppliersByProduct[m.product_id]) suppliersByProduct[m.product_id] = [];
-      if (!suppliersByProduct[m.product_id].includes(m.supplier)) {
-        suppliersByProduct[m.product_id].push(m.supplier);
-      }
-      supplierSet.add(m.supplier);
-    }
-  }
-
-  /* The grid's supplier filter/search maps were fed ONLY by the free-text
-     model.supplier column — which is empty on every current row, while the
-     card chip resolves through product_suppliers→contacts. Feed the same
-     link path into the maps, so search/filter agree with what the card
-     shows. supplierAltByProduct carries the Chinese company names so 易利
-     finds YILI's machines. */
-  const supplierAltByProduct: Record<string, string> = {};
-  const supplierLogos: Record<string, string> = {};
-  for (const [pid, sid] of linkedSupplier) {
-    const lite = supById.get(sid);
-    if (!lite) continue;
-    if (!suppliersByProduct[pid]) suppliersByProduct[pid] = [];
-    if (!suppliersByProduct[pid].includes(lite.name)) suppliersByProduct[pid].push(lite.name);
-    supplierSet.add(lite.name);
-    if (lite.cn) supplierAltByProduct[pid] = lite.cn;
-    if (lite.logo) supplierLogos[lite.name] = lite.logo;
-  }
-
-  const signals: Record<
-    string,
-    {
-      readiness: number | null;
-      missing: string[];
-      cost: number | null;
-      pricingMode: "fixed" | "from" | "on_request";
-      priceNote: string | null;
-      visible: boolean;
-      updatedAt: string | null;
-      supplier: { id: string | null; name: string; logo: string | null } | null;
-      costNote: string | null;
-      costExtras: { price: number | null; note: string }[];
-    }
-  > = {};
-
-  for (const p of (prodRes.data ?? []) as unknown as ProductRow[]) {
-    const mediaCounts = media.get(p.id) ?? { main: 0, gallery: 0, packing: 0, manual: 0, video: 0 };
-    const model = primary.get(p.id);
-    const values = (p.schema_specs ?? {}) as Record<string, unknown>;
-    /* One definition of "this product's cost", used by all three consumers
-       below so the bar, the chip and the number can never disagree. */
-    const effectiveCost = model?.cost_price ?? linkCost.get(p.id) ?? null;
-    const { schema } = resolveSchema({
-      divisionCode: p.division_slug || "",
-      categoryCode: p.category_slug || "",
-      subcategoryCode: subCode.get(p.subcategory_slug || "") || "",
-    });
-
-    /* HONESTY GUARD: computeReadiness scores a dimension with zero
-       applicable items as 100 ("nothing missing"). For a product with no
-       spec template resolved that inflates the overall to ~70% while the
-       record is actually empty — exactly the lie a readiness bar must
-       never tell. No template → no percentage, and the template itself
-       becomes the first gap chip. */
-    const report = schema ? computeReadiness({
-      schema,
-      values,
-      media: mediaCounts,
-      commercial: {
-        product_name: p.product_name,
-        primary_model: model?.primary_model ?? null,
-        supplier_model: model?.model_name ?? null,
-        cost_price: effectiveCost,
-        global_price: model?.global_price ?? null,
-        pricing_mode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
-        warranty: p.warranty,
-        moq: p.moq == null ? null : String(p.moq),
-        lead_time: p.lead_time,
-      },
-      knowledge: (p.schema_knowledge ?? []) as ProductKnowledgeBlock[],
-    }) : null;
-
-    /* Actionable gaps, ordered by how much they block publishing.
-       Only the first three reach the card — a wall of chips is noise. */
-    const missing: string[] = [];
-    if (!schema) missing.push("template");
-    if (mediaCounts.main === 0 && mediaCounts.gallery === 0) missing.push("photo");
-    if (Object.values(values).filter((v) => v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)).length === 0)
-      missing.push("specs");
-    if (!model?.primary_model) missing.push("code");
-    /* Only a FIXED-price model can be "missing" its cost. A machine quoted
-       per configuration has no cost to fill in, and flagging it forever was
-       what buried the products that genuinely are unfinished. */
-    if (effectiveCost == null && (model?.pricing_mode ?? "fixed") === "fixed") missing.push("cost");
-    if (!(p.excerpt || "").trim() && !(p.description || "").trim()) missing.push("description");
-
-    signals[p.id] = {
-      readiness: report ? report.overall : null,
-      missing: missing.slice(0, 3),
-      cost: canSeeCosts ? effectiveCost : null,
-      pricingMode: (model?.pricing_mode as "fixed" | "from" | "on_request" | null) ?? "fixed",
-      priceNote: model?.price_note ?? null,
-      visible: p.visible === true,
-      updatedAt: p.updated_at,
-      costNote: canSeeCosts ? (linkNote.get(p.id) ?? null) : null,
-      costExtras: canSeeCosts ? (linkExtras.get(p.id) ?? []) : [],
-      supplier: (() => {
-        /* id rides along so the card can deep-link to the Suppliers app. */
-        const pick = (l: SupLite) => ({ id: l.id, name: l.name, logo: l.logo });
-        const linkId = linkedSupplier.get(p.id);
-        if (linkId && supById.has(linkId)) return pick(supById.get(linkId)!);
-        const txt = (model?.supplier || "").trim();
-        if (!txt) return null;
-        /* Known supplier → real logo+id; unknown free text → name only. */
-        const byName = supByName.get(norm(txt));
-        return byName ? pick(byName) : { id: null, name: txt, logo: null };
-      })(),
-    };
-  }
-
-  /* ROUND-TRIP BUDGET: on the operators' network a single request costs
-     ~1-2s before any work happens (a static edge asset measures the same),
-     and parallel requests contend with each other. This endpoint already
-     reads product_models and product_media in full, so it also returns the
-     model summary and the thumbnail map — three requests collapse into one
-     for the Product Data grid. The public catalogue still calls the
-     separate endpoints, which are unchanged.
-
-     Private SWR cache: signals move at data-entry speed, not per click.
-     30s fresh / 5min stale keeps repeat opens instant without ever
-     serving another account's view (private). */
-  return NextResponse.json(
-    {
-      signals,
-      costVisible: canSeeCosts,
-      models: {
-        counts,
-        suppliers: suppliersByProduct,
-        supplierAlt: supplierAltByProduct,
-        modelNames: modelNamesByProduct,
-        nameAlts: (() => {
-          const alt: Record<string, string> = {};
-          for (const t of (trRes.data ?? []) as Array<{ product_id: string; product_name: string | null }>) {
-            if (!t.product_name) continue;
-            alt[t.product_id] = alt[t.product_id] ? alt[t.product_id] + " " + t.product_name : t.product_name;
-          }
-          return alt;
-        })(),
-        allSuppliers: Array.from(supplierSet).sort(),
-        supplierLogos,
-        primaryModelNames,
-      },
-      mainImages,
-    },
-    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
-  );
+  /* POST responses are not cached by the browser, and this one should not
+     be: signals move at data-entry speed, and the page-level warm start
+     (thumbnails in localStorage) already covers the repeat open. */
+  return NextResponse.json(payload, { headers: { "Cache-Control": "private, no-store" } });
 }

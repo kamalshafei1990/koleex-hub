@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, linkBtnCls, sectionTitleCls } from "../shared";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -23,21 +22,11 @@ export default function CustomersModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [c, inv] = await Promise.all([
-        supabase.from("customers").select("id,name,country,tier,is_active").order("name", { ascending: true }).limit(50),
-        supabase.from("invoices").select("customer_id,total,status"),
-      ]);
-      if (cancelled) return;
-      const list = (c.data ?? []) as CustomerRow[];
-      setRows(list);
-      // Sum invoice totals (paid + unpaid) per customer for the
-      // "top customers by revenue" sort.
-      const m: Record<string, number> = {};
-      for (const i of (inv.data ?? []) as { customer_id: string | null; total: number | null }[]) {
-        if (!i.customer_id) continue;
-        m[i.customer_id] = (m[i.customer_id] || 0) + (Number(i.total) || 0);
-      }
-      setRevenueByCustomer(m);
+      const res = await fetch("/api/sales/overview?module=customers", { credentials: "include" });
+      const json = res.ok ? await res.json() : null;
+      if (cancelled || !json) return;
+      setRows((json.customers ?? []) as CustomerRow[]);
+      setRevenueByCustomer((json.revenue ?? {}) as Record<string, number>);
       setLoading(false);
     })();
     return () => { cancelled = true; };

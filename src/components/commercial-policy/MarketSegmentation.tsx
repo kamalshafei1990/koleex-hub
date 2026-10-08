@@ -186,7 +186,7 @@ export default function MarketSegmentation({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search a country, code, or region (Egypt, EG, Africa…)"
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
+            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -217,7 +217,7 @@ export default function MarketSegmentation({
                       key={c.code}
                       onClick={editing ? undefined : () => router.push(`/commercial-policy/market/${c.code}`)}
                       title={editing ? undefined : "Open market profile"}
-                      className={`flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-1.5 ${editing ? "" : "cursor-pointer hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface)] transition-colors"}`}
+                      className={`flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 ${editing ? "" : "cursor-pointer hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface)] transition-colors"}`}
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="text-[15px] leading-none">{c.flag}</span>

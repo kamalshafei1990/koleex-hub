@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { BankAccount } from "@/lib/finance/types";
+import { canSeeBankAndProfit, hideBankBalances } from "@/lib/experience";
 
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -50,5 +51,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ account: data as BankAccount });
+  /* The balances go only to «Bank & Profit» (src/lib/experience). */
+  return NextResponse.json({ account: (await canSeeBankAndProfit(auth)) ? (data as BankAccount) : hideBankBalances(data as BankAccount) });
 }

@@ -23,6 +23,7 @@ import { useToast } from "@/components/kds/useToast";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import DocToolbar, { type SaveState } from "@/components/documents/DocToolbar";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 import { saveDocument, removeDocument, type DocumentRow } from "@/lib/documents-store";
 import { downloadDocXlsx } from "@/lib/excel-export";
 import { useScopeContext } from "@/lib/use-scope";
@@ -31,6 +32,7 @@ import { CHINA_PORTS, PORTS_BY_COUNTRY, PORT_COUNTRIES, COUNTRY_FLAG } from "@/l
 import { PortCombobox } from "@/components/documents/PortCombobox";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
+import { legalNameEn } from "@/lib/legal-name";
 
 const T = {
   black: "#0A0A0A",
@@ -55,12 +57,13 @@ function MetaStripCell({ label, isFirst, isLast, children }: { label: string; is
 }
 const labelSpan: React.CSSProperties = { color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" };
 
+/* The English name is not here: a packing list prints the legal name in
+   force on the day it was created (lib/legal-name). */
 const COMPANY = {
-  name: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
   nameZh: "科莱恪斯国际商业管理（台州）有限公司",
   address:
     "ROOM 206, BUILDING 88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA",
-  tel: "+86 0576 8892 7796",
+  tel: "+86 576 8892 7796",
   web: "www.koleexgroup.com",
 };
 
@@ -193,6 +196,7 @@ export default function PackingListDoc({
   onChanged: () => void;
 }) {
   const { t } = useTranslation(documentsT);
+  const legalName = legalNameEn(initial?.created_at);
   const seed = (initial?.doc ?? {}) as { rows?: PackingRow[]; meta?: PackingMeta };
   const [rows, setRowsState] = useState<PackingRow[]>(() =>
     seed.rows && seed.rows.length ? seed.rows.map((r) => ({ ...blankRow(), ...r })) : Array.from({ length: 8 }, blankRow),
@@ -229,9 +233,9 @@ export default function PackingListDoc({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { stampUrl: string | null; signatureUrl: string | null };
+        /* Shared tenant fetch (lib/tenant-assets) — one request per session. */
+        const json = await fetchSavedAssets();
+        if (!json) return;
         if (cancelled) return;
         setSavedStampUrl(json.stampUrl);
         setSavedSignatureUrl(json.signatureUrl);
@@ -248,6 +252,7 @@ export default function PackingListDoc({
       const res = await fetch("/api/quotations/saved-assets", { method: "POST", credentials: "include", body: form });
       if (!res.ok) { const j = await res.json().catch(() => ({})); showToast(`Upload failed: ${humanizeError(j.error)}`, "error"); return; }
       const json = (await res.json()) as { kind: string; url: string };
+      invalidateSavedAssets();
       if (kind === "stamp") { setSavedStampUrl(json.url); setMedia("stampUrl", json.url); }
       else { setSavedSignatureUrl(json.url); setMedia("signatureUrl", json.url); }
     } catch (e) { showToast(`Upload failed: ${humanizeError(e)}`, "error"); }
@@ -323,7 +328,54 @@ export default function PackingListDoc({
     setDirty(true);
     setSaveState("idle");
   };
-  const handlePrint = () => window.print();
+  /* ── Print / PDF ──────────────────────────────────────────────────────
+     Through a HIDDEN IFRAME pointing at /documents/<id>/print, never
+     window.print() on this window. Printing the editor drags the Hub layout,
+     the Aurora scope and the ground canvas into the print pass, and the
+     surviving wrappers impose their own heights on the page box. Measured on
+     a real list: the sheet came out 297 × 356.5 mm against A4 landscape's
+     297 × 210 — 1.7 pages tall, so the second sheet carried a stub above 70%
+     white. The invoice and the contract print the same way for the same
+     reason.
+
+     An unsaved list has no id to print from, so it falls back to the old
+     behaviour rather than doing nothing. */
+  const handlePrint = () => {
+    if (!docId) {
+      window.print();
+      return;
+    }
+    const FRAME_ID = "koleex-packing-print-frame";
+    let frame = document.getElementById(FRAME_ID) as HTMLIFrameElement | null;
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.id = FRAME_ID;
+      frame.style.position = "fixed";
+      frame.style.left = "-10000px";
+      frame.style.top = "0";
+      frame.style.width = "297mm";
+      frame.style.height = "210mm";
+      frame.style.border = "none";
+      /* Off-screen by position, never visibility:hidden — some browsers skip
+         invisible iframes when printing. */
+      document.body.appendChild(frame);
+    }
+    frame.src = `/documents/${encodeURIComponent(docId)}/print?_t=${Date.now()}`;
+    const onLoad = () => {
+      frame!.removeEventListener("load", onLoad);
+      const ready = () => {
+        const win = frame!.contentWindow as (Window & { __quotation_pdf_ready__?: boolean }) | null;
+        if (win?.__quotation_pdf_ready__) {
+          win.focus();
+          win.print();
+        } else {
+          setTimeout(ready, 100);
+        }
+      };
+      ready();
+    };
+    frame.addEventListener("load", onLoad);
+  };
 
   const handleExcel = useCallback(async () => {
     const dataRows: (string | number | null)[][] = rows
@@ -350,6 +402,7 @@ export default function PackingListDoc({
     await downloadDocXlsx(fileBase, {
       docTitle: "PACKING LIST",
       number: meta.invoiceNo || "draft",
+      madeAt: initial?.created_at,
       metaStrip: [
         ["DATE", meta.date || ""],
         ["INVOICE NO", meta.invoiceNo || ""],
@@ -497,7 +550,7 @@ export default function PackingListDoc({
             {/* Brand strips */}
             <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
               <div style={{ background: T.black, color: "#fff", padding: "7px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, fontWeight: 600, letterSpacing: "0.04em" }}>
-                <span>{COMPANY.name}</span>
+                <span>{legalName}</span>
                 <span>{COMPANY.nameZh}</span>
               </div>
               <div style={{ background: T.surface, color: "#333", padding: "5px 16px", textAlign: "center", fontSize: 9, fontWeight: 600, letterSpacing: "0.18em" }}>
@@ -561,7 +614,7 @@ export default function PackingListDoc({
               <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>From</div>
                 <div style={{ padding: "10px 14px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4, letterSpacing: "0.01em" }}>{COMPANY.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4, letterSpacing: "0.01em" }}>{legalName}</div>
                   <div style={{ fontSize: 10, lineHeight: 1.5, color: T.inkSoft, marginBottom: 8 }}>{COMPANY.address}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "55px 1fr", rowGap: 3, columnGap: 8, fontSize: 10 }}>
                     <span style={labelSpan}>Phone</span><span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{COMPANY.tel}</span>

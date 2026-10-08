@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_SRCG } from "@/lib/translations/contacts/srcg";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   SOURCING_ROLE_LABELS, SOURCING_ROLE_ORDER, sourcingRoleLabel, SOURCING_ROLE_RANK,
@@ -59,17 +59,16 @@ const bandCls: Record<string, string> = {
 type Summary = { score: number | null; priority: number | null; preferredProducts: number; blockedProducts: number; soleSource: boolean } | null;
 
 export default function SourcingSection({
-  supplierId, supplierName, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
+  supplierId, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
 }: {
   supplierId: string;
-  supplierName: string;
   sourcing: Summary;
   sourcingProfile: Row | null;
   sourcingLinks: Row[];
   specializations: Row[];
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_SRCG);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const band = sourcingBand(sourcing?.score ?? null);
@@ -107,7 +106,9 @@ export default function SourcingSection({
   const [aCapacity, setACapacity] = useState(""); const [aCapacityUnit, setACapacityUnit] = useState("units / month");
   const [aBusy, setABusy] = useState(false); const [aErr, setAErr] = useState<string | null>(null);
   useEffect(() => { if (!addOpen || products.length) return;
-    fetch("/api/products", { credentials: "include" }).then((r) => r.json()).then((j) => setProducts(Array.isArray(j.products) ? j.products : [])).catch(() => {}); }, [addOpen, products.length]);
+    /* ?view=list: the picker matches on product_name and keeps the row —
+       the full projection was 978 KB for a search box. */
+    fetch("/api/products?view=list", { credentials: "include" }).then((r) => r.json()).then((j) => setProducts(Array.isArray(j.products) ? j.products : [])).catch(() => {}); }, [addOpen, products.length]);
   const productMatches = useMemo(() => {
     const q = pq.trim().toLowerCase(); if (!q) return [];
     return products.filter((p) => str(p, "product_name").toLowerCase().includes(q)).slice(0, 6);
@@ -222,12 +223,20 @@ export default function SourcingSection({
                       {terms.length ? <div className="mt-1 flex flex-wrap gap-1.5">{terms.map((t, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{t}</span>)}</div> : null}
                       {str(l, "risk_notes") ? <div className="mt-1 text-[11px] text-[var(--text-faint)]">{str(l, "risk_notes")}</div> : null}
                     </div>
+                    {l.derived ? (
+                      /* Derived from product_suppliers.sourcing_status (the
+                         product form's Supplier tab) — no roles-table row to
+                         PATCH/DELETE, so it renders read-only. Change it on
+                         the product, or assign a real role here to override. */
+                      <span className="shrink-0 self-center rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] text-[var(--text-faint)]">{t("srcg.fromProductForm", "from product form")}</span>
+                    ) : (
                     <div className="flex shrink-0 items-center gap-0.5">
                       <select value={str(l, "sourcing_role")} disabled={busyId === id} onChange={(e) => setRole(l, e.target.value)} className="rounded-md bg-[var(--bg-surface)] px-1.5 py-1 text-[11px] text-[var(--text-secondary)] outline-none">
                         {SOURCING_ROLE_ORDER.map((r) => <option key={r} value={r}>{SOURCING_ROLE_LABELS[r]}</option>)}
                       </select>
                       <button type="button" disabled={busyId === id} onClick={() => removeRole(l)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title={t("srcg.removeRole", "Remove role")}><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
+                    )}
                   </div>
                 </div>
               );
@@ -253,7 +262,7 @@ export default function SourcingSection({
       {/* profile editor modal */}
       {pEdit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !pBusy && setPEdit(false)}>
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><GaugeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.sourcingScore", "Sourcing score")}</span></div>
             <div className="text-[11px] text-[var(--text-faint)]">{t("srcg.autoScorePrefix", "Auto score (from risk · readiness · negotiation · certs): ")}<span className="font-semibold text-[var(--text-secondary)]">{sourcing?.score ?? "—"}</span>{t("srcg.autoScoreSuffix", ". Set an override to pin it.")}</div>
             <div className="grid grid-cols-2 gap-3">
@@ -273,7 +282,7 @@ export default function SourcingSection({
       {/* assign role modal */}
       {addOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !aBusy && setAddOpen(false)}>
-          <div className="max-h-[88vh] w-full max-w-md space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative max-h-[88vh] w-full max-w-md space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><PackageIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.assignModalTitle", "Assign product sourcing role")}</span></div>
             <Field label={t("srcg.productLabel", "Product")}>
               {selProduct ? (
@@ -314,7 +323,7 @@ export default function SourcingSection({
       {/* comparison modal */}
       {cmpOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !cmpBusy && setCmpOpen(false)}>
-          <div className="max-h-[88vh] w-full max-w-3xl space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative max-h-[88vh] w-full max-w-3xl space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><ArrowRightLeftIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("srcg.compareModalTitle", "Compare suppliers")}</span></div>
             {!cmpRows ? (
               <>

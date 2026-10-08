@@ -30,8 +30,13 @@ import type {
   CashMovementType,
 } from "@/lib/finance/types";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_BANK } from "@/lib/translations/finance/bank";
+import { FIN_MOVEMENT } from "@/lib/translations/finance/movement";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_BANK, ...FIN_MOVEMENT } as const;
+
 
 export const INPUT =
   "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
@@ -65,7 +70,7 @@ export function EditDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [local, setLocal] = useState<Partial<BankAccount>>(draft ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +107,7 @@ export function EditDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={onClose}>
       <div
-        className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative flex w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl"
         style={{ maxHeight: "min(92vh, 800px)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -151,6 +156,14 @@ export function EditDrawer({
                 </select>
               </Field>
             </div>
+            {/* Without «Bank & Profit» the row came with its balances as 0
+                (balances_hidden) and the server ignores them on save — so the
+                inputs are not offered at all, rather than showing zeros. */}
+            {local.balances_hidden ? (
+              <p className="rounded-lg border border-[var(--border-faint)] px-3 py-2 text-[11.5px] text-[var(--text-dim)]">
+                {t("bank.field.balancesHidden", "Balances are shown and set only with «Bank & Profit» in Roles & Permissions.")}
+              </p>
+            ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label={t("bank.field.available", "Available")}>
                 <input type="number" inputMode="decimal" className={INPUT + " tabular-nums"} value={local.available_balance ?? 0}
@@ -169,6 +182,7 @@ export function EditDrawer({
                   onChange={(e) => setLocal({ ...local, opening_balance: Number(e.target.value) || 0 })} />
               </Field>
             </div>
+            )}
             <label className="inline-flex items-center gap-2 text-[12px] text-[var(--text-highlight)]">
               <input type="checkbox" checked={!!local.is_primary} onChange={(e) => setLocal({ ...local, is_primary: e.target.checked })} />
               {t("bank.field.makePrimary", "Make primary for this currency")}
@@ -211,7 +225,7 @@ export function ManualMovementDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [draft, setDraft] = useState<{
     bank_account_id: string;
     movement_type: CashMovementType;
@@ -289,7 +303,7 @@ export function ManualMovementDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={onClose}>
-      <div className="relative flex w-full max-w-lg flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative flex w-full max-w-lg flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div>
             <h2 className="text-[14px] font-semibold">{t("movement.title", "Manual cash movement")}</h2>

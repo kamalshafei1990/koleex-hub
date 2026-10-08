@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
-import { invalidateViewAsLists } from "./ViewAsPicker";
+import { invalidateViewAsLists } from "./view-as-cache";
 
 export default function ViewAsBanner() {
   const router = useRouter();

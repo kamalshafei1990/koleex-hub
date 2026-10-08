@@ -14,12 +14,19 @@
    the DOM cheap and the file obvious.
    --------------------------------------------------------------------------- */
 
-export default function TypingIndicator(): React.ReactElement {
+import { COPY } from "@/components/ai/copy";
+import { type Lang } from "@/lib/i18n";
+
+/* `lang` is optional and defaults to English: this is the announcement a
+   screen reader makes while the assistant is composing, and it was the one
+   string in this file — hardcoded, in a product that translates the rest. */
+export default function TypingIndicator({ lang = "en" }: { lang?: Lang } = {}): React.ReactElement {
+  const copy = COPY[lang] ?? COPY.en;
   return (
     <div
       className="koleex-typing-indicator"
       role="status"
-      aria-label="Koleex AI is thinking"
+      aria-label={copy.thinkingAria}
     >
       <span />
       <span />
@@ -30,7 +37,10 @@ export default function TypingIndicator(): React.ReactElement {
           align-items: center;
           gap: 6px;
           padding: 10px 14px;
-          background: var(--surface-subtle, rgba(0, 0, 0, 0.04));
+          /* --bg-surface-subtle is the defined token; the old --surface-subtle
+             never existed, so the dots sat on a 4% black that vanished on the
+             dark ground (audit, 2026-09-07). */
+          background: var(--bg-surface-subtle, rgba(0, 0, 0, 0.04));
           border-radius: 14px;
           min-height: 20px;
         }

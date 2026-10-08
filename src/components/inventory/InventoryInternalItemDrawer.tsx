@@ -50,6 +50,9 @@ const T: Translations = {
   "inv.int.opening.note":   { en: "An opening-balance movement will be posted automatically.", zh: "将自动过账期初余额。", ar: "سيتم ترحيل حركة رصيد افتتاحي تلقائياً." },
   "inv.int.unit_cost":      { en: "Unit cost (optional)",     zh: "单价（可选）",         ar: "تكلفة الوحدة (اختياري)" },
   "inv.int.unit_cost.ph":   { en: "0.00",                     zh: "0.00",                ar: "0.00" },
+  "inv.int.err.cost":       { en: "Item costs are set only with «Can see private data» in Roles & Permissions — leave the unit cost empty.",
+                              zh: "只有在角色与权限中开启「可查看私密数据」才能设置物品成本——请将单价留空。",
+                              ar: "تكاليف الأصناف تُضبط فقط مع «يرى البيانات الخاصة» في الأدوار والصلاحيات — اترك تكلفة الوحدة فارغة." },
   "inv.int.err.name":       { en: "Item name required.",      zh: "请填写物品名称。",     ar: "اسم العنصر مطلوب." },
   "inv.int.err.warehouse":  { en: "Pick a warehouse for the opening quantity.", zh: "请选择期初数量的仓库。", ar: "اختر مستودعاً للكمية الافتتاحية." },
   "inv.int.search.ph":      { en: "Search items — laptop, A4 paper, helmet…", zh: "搜索物品：笔记本、A4纸、头盔…", ar: "ابحث: لاب توب، ورق A4، خوذة…" },
@@ -535,7 +538,9 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
         body: JSON.stringify(payload),
       });
       const j = await r.json();
-      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+      /* Without the «private records» switch the server refuses a cost
+         (code needs_private_data — can't read → can't write). */
+      if (!r.ok) { setError(j.code === "needs_private_data" ? t("inv.int.err.cost") : humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -565,7 +570,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl sm:h-auto sm:max-h-[90vh] sm:w-[min(760px,94vw)] sm:rounded-2xl sm:border sm:border-[var(--border-color)]"
+        className="kx-app kx-glass-pop kx-pop-in relative flex h-full w-full flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl sm:h-auto sm:max-h-[90vh] sm:w-[min(760px,94vw)] sm:rounded-2xl sm:border sm:border-[var(--border-color)]"
       >
         {/* ── Header ──────────────────────────────────────────── */}
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-color)] px-5 py-4">

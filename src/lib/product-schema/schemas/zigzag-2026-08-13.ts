@@ -57,11 +57,11 @@
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
-/* The four shared groups were imported here and never used — this template
-   spells out its own Weight & Packing group instead, because the catalogue
-   prints net/gross as one pair and a carton size in cm, which the shared
-   packing group does not model. The dead imports are removed; the template's
-   shape is deliberately left as built. */
+/* The four shared groups were imported here and never used. This template used
+   to spell out its own Weight & Packing group because the catalogue prints
+   net/gross as one pair and a carton size in cm — both of which the fixed
+   Packing section now models properly (cm throughout, one row per crate), so
+   the bespoke group is gone and this template is specs only. */
 
 const pub = DEFAULT_PUBLIC_VISIBILITY;
 
@@ -249,31 +249,12 @@ export const ZIGZAG_SCHEMA: ProductSchemaDefinition = {
         },
       ],
     },
-    {
-      id: "zigzag-logistics",
-      title: "Weight & Packing",
-      order: 50,
-      fields: [
-        {
-          id: "net_weight", key: "net_weight", label: "Net Weight", order: 10,
-          fieldType: "unit_number" as const, dataType: "number" as const, unit: "kg", required: false,
-          description: "Printed as a net/gross pair (e.g. 45/40, 24/21) — the FIRST number.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-        {
-          id: "gross_weight", key: "gross_weight", label: "Gross Weight", order: 20,
-          fieldType: "unit_number" as const, dataType: "number" as const, unit: "kg", required: false,
-          description: "The SECOND number of the same pair.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-        {
-          id: "packing_dimensions", key: "packing_dimensions", label: "Packing Dimensions", order: 30,
-          fieldType: "text" as const, dataType: "string" as const, required: false,
-          description: "Carton a×b×c in cm (67x25x57, 54.5x24x36.5 …). Kept as text because the page gives one string, not three measured axes.",
-          ...pub, visualRenderType: "spec_card" as const,
-        },
-      ],
-    },
+    /* "Weight & Packing" — REMOVED 2026-09-13. It carried net_weight,
+       gross_weight and packing_dimensions and, uniquely, no `formTab`, so it
+       rendered on SPECS while every other template asked the same three on
+       Packing & Logistics. Packing is no longer a template question at all:
+       it is one fixed section on the Packing & Logistics tab, asked of every
+       product (products.logistics). */
   ],
 };
 

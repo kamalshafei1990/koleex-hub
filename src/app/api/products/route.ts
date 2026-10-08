@@ -24,13 +24,17 @@ import { coerceProductArrayColumns } from "@/lib/product-array-columns";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
-import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { hasProductCostAccess, hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { computeProductSignals } from "@/lib/server/product-signals";
 import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
+import { FRESHNESS_COLUMNS, foldFreshness } from "@/lib/products-freshness";
 import { PRODUCTS_LIST_CONFIG } from "@/lib/server-list/products-config";
 import { resolveProductSearchReach } from "@/lib/server/product-search-reach";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 
 export async function GET(req: Request) {
   const _t = stageTimer("products.list");
@@ -44,7 +48,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const listView = url.searchParams.get("view") === "list";
   const canSeeSecrets = await hasProductDataAccess(auth);
-  const cols = listView ? LIST_PRODUCT_COLUMNS : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
+  /* The list ALSO reads the three freshness moments — and folds them into
+     one small `fresh` number before responding (products-freshness.ts says
+     why: 60 KB of timestamps for a fact that is 0 on nearly every row). They
+     are appended here, not in LIST_PRODUCT_COLUMNS, so that constant keeps
+     describing what the browser receives. */
+  const cols = listView
+    ? `${LIST_PRODUCT_COLUMNS}, ${FRESHNESS_COLUMNS.join(", ")}`
+    : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
   _t.mark("auth");
 
   /* ── ?paged=1 — server-driven list (search / filter / sort / page in SQL) ──
@@ -89,7 +100,9 @@ export async function GET(req: Request) {
        no window), fetching two slug columns and nothing else. Those bytes never
        leave the datacenter; the browser receives only the aggregated numbers, a
        few hundred bytes. Page 1 only — the numbers do not change as you scroll,
-       and re-counting per page would pay for the whole match set every page. */
+       and re-counting per page would pay for the whole match set every page.
+       Read in pages (lib/server/all-rows): alone, the API stops a read at
+       1000 rows — past 1000 products the counts would come up short again. */
     const GROUP_SCAN_MAX = 50_000;
     const buildGroupCountsQuery = () => {
       if (listReq.page !== 1) return null;
@@ -98,8 +111,7 @@ export async function GET(req: Request) {
         .select("category_slug, subcategory_slug")
         .eq("tenant_id", auth.tenant_id);
       if (!canSeeSecrets) gq = gq.eq("status", "active");
-      return applyServerList(gq, listReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
-        .range(0, GROUP_SCAN_MAX - 1);
+      return applyServerList(gq, listReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false });
     };
 
     const { data, error: pagedError, count } = await pq;
@@ -114,6 +126,8 @@ export async function GET(req: Request) {
        objects and the grid needs no second code path. The cast is only
        because `select()` takes a runtime string, which erases the row type. */
     const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    const now = Date.now();
+    for (const r of rows) foldFreshness(r, now);
 
     /* MODEL CODES TRAVEL WITH THE PAGE. They used to arrive later, in the
        signals payload, and the card is built around them — the heading is the
@@ -146,12 +160,72 @@ export async function GET(req: Request) {
           .order("order", { ascending: true })
           .then((r) => r)
       : null;
-    const groupsPromise = buildGroupCountsQuery()?.then((r) => r) ?? null;
+    const groupsQuery = buildGroupCountsQuery();
+    const groupsPromise = groupsQuery ? allRows(groupsQuery.order("id"), "group counts", GROUP_SCAN_MAX) : null;
+    /* FACETS FOR THE CATEGORY RAIL (owner, 22 Sep 2026). The rail's cards
+       FILTER by category, so they must keep showing every category of the
+       match set — with its count — while one of them is selected. The group
+       count above runs over the match set INCLUDING the category and
+       subcategory filters, so it would collapse to the chosen card. Same
+       scan, those two filters dropped; page 1 only, and only while one of
+       them is applied — otherwise the group counts ARE the facets and no
+       second query runs. */
+    const facetReq = (listReq.filters.category || listReq.filters.subcategory)
+      ? { ...listReq, filters: Object.fromEntries(Object.entries(listReq.filters).filter(([k]) => k !== "category" && k !== "subcategory")) }
+      : null;
+    const facetsPromise = listReq.page === 1 && facetReq
+      ? (() => {
+          let fq = supabaseServer
+            .from("products")
+            .select("category_slug, subcategory_slug")
+            .eq("tenant_id", auth.tenant_id);
+          if (!canSeeSecrets) fq = fq.eq("status", "active");
+          return allRows(applyServerList(fq, facetReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
+            .order("id"), "facets", GROUP_SCAN_MAX);
+        })()
+      : null;
+    /* DIVISIONS WITH PRODUCTS — the whole tenant, NOT the match set. The
+       division strip is navigation: it must show where products exist
+       regardless of the filter currently applied (a strip filtered by its
+       own selection would collapse to one pill). Page 1 only, one indexed
+       column, and the catalogue rule applies (active only for callers
+       without the Product Data grant) so a customer never sees a division
+       whose only products are drafts. Owner (22 Sep 2026): the eight empty
+       divisions were on every customer's screen, promising ranges that do
+       not exist yet. */
+    const divisionsPromise = listReq.page === 1
+      ? (() => {
+          let dq = supabaseServer
+            .from("products")
+            .select("division_slug")
+            .eq("tenant_id", auth.tenant_id);
+          if (!canSeeSecrets) dq = dq.eq("status", "active");
+          return allRows(dq.order("id"), "divisions", GROUP_SCAN_MAX);
+        })()
+      : null;
 
+    /* THE WORK SIGNALS RIDE WITH THE PAGE (owner, 2026-10-07: "products show
+       but family/price/supplier come late"). They used to be a second, serial
+       round trip — the client POSTed the page's ids to /api/products/signals
+       after the list landed, so every column it refines painted a full China
+       round trip (~1.5–2 s) after the grid. The list already knows the page's
+       ids and runs its other queries in parallel; the signals join them, and
+       the response time becomes the SLOWEST query, not the SUM of two trips.
+       Product Data access only — the same gate the signals endpoint uses, so
+       the public catalogue's slim payload is unchanged. */
+    const signalsPromise = canSeeSecrets && ids.length
+      ? computeProductSignals(auth.tenant_id, ids, await hasProductCostAccess(auth))
+      : null;
     let models: {
       counts: Record<string, number>;
       primaryModelNames: Record<string, string>;
       modelNames: Record<string, string[]>;
+      /* Supplier-model codes — search reach only, NEVER displayed (the card
+         chips keep showing Koleex codes; the "rules must match signals"
+         comment above guards the display lists, not this one). Owner,
+         2026-10-07: typing the supplier's own model code must find the
+         product while still typing, not one server round trip later. */
+      searchModels: Record<string, string[]>;
     } | undefined;
     if (modelsPromise) {
       const { data: mRows, error: mErr } = await modelsPromise;
@@ -159,6 +233,7 @@ export async function GET(req: Request) {
       const counts: Record<string, number> = {};
       const names: Record<string, string[]> = {};
       const primary: Record<string, string> = {};
+      const searchNames: Record<string, string[]> = {};
       /* THESE RULES MUST MATCH /api/products/signals EXACTLY. Both feed the
          same card, so any difference shows up as the card visibly correcting
          itself a second after it painted — the first version of this used
@@ -178,13 +253,20 @@ export async function GET(req: Request) {
           const list = (names[raw.product_id] ??= []);
           if (!list.includes(label)) list.push(label);
         }
+        /* the supplier's own designation joins the search roster when it
+           differs from the Koleex code */
+        const sup = raw.model_name?.trim();
+        if (sup && sup !== label) {
+          const sl = (searchNames[raw.product_id] ??= []);
+          if (!sl.includes(sup)) sl.push(sup);
+        }
       }
-      models = { counts, primaryModelNames: primary, modelNames: names };
+      models = { counts, primaryModelNames: primary, modelNames: names, searchModels: searchNames };
     }
     _t.mark("models");
 
     let groupCounts:
-      | { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean }
+      | { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; facets?: { categories: Record<string, number>; subcategories: Record<string, number> }; capped: boolean }
       | undefined;
     if (groupsPromise) {
       const { data: gRows, error: gErr } = await groupsPromise;
@@ -206,14 +288,67 @@ export async function GET(req: Request) {
         const capped = (gRows?.length ?? 0) >= GROUP_SCAN_MAX;
         if (capped) console.warn("[api/products paged groupCounts] scan capped at", GROUP_SCAN_MAX);
         groupCounts = { categories, subcategories, capped };
+        if (facetsPromise) {
+          const { data: fRows, error: fErr } = await facetsPromise;
+          /* A failed facet scan must not fail the page: the rail then shows
+             the group counts, i.e. the selected card alone, until the next
+             load. */
+          if (fErr) console.error("[api/products paged facets]", fErr.message);
+          else {
+            const fc: Record<string, number> = {};
+            const fs: Record<string, number> = {};
+            for (const g of (fRows ?? []) as { category_slug: string | null; subcategory_slug: string | null }[]) {
+              const c = g.category_slug || "_uncategorized";
+              const s = g.subcategory_slug || "_uncategorized";
+              fc[c] = (fc[c] ?? 0) + 1;
+              fs[`${c}/${s}`] = (fs[`${c}/${s}`] ?? 0) + 1;
+            }
+            groupCounts.facets = { categories: fc, subcategories: fs };
+          }
+        } else {
+          groupCounts.facets = { categories, subcategories };
+        }
+      }
+    }
+    if (divisionsPromise) {
+      const { data: dRows, error: dErr } = await divisionsPromise;
+      /* A failed count must not fail the page; the strip then shows every
+         division, as it always did. */
+      if (dErr) console.error("[api/products paged divisionCounts]", dErr.message);
+      else {
+        const divisions: Record<string, number> = {};
+        for (const d of (dRows ?? []) as { division_slug: string | null }[]) {
+          const k = d.division_slug || "_uncategorized";
+          divisions[k] = (divisions[k] ?? 0) + 1;
+        }
+        groupCounts = { categories: {}, subcategories: {}, capped: false, ...groupCounts, divisions };
       }
     }
     _t.mark("groups");
 
-    const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts };
+    let signalsBundle: unknown;
+    if (signalsPromise) {
+      const b = await signalsPromise.catch((e: unknown) => {
+        /* a signals hiccup must not sink the list — the client falls back
+           to the POST waterfall when the bundle is absent */
+        console.error("[api/products paged signals]", e instanceof Error ? e.message : e);
+        return null;
+      });
+      if (b) signalsBundle = b;
+      _t.mark("signals");
+    }
+    const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts, ...(signalsBundle ? { signalsBundle } : {}) };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
+    /* SYNC RULE (owner, 19/09/2026): a change in Product Data shows on the
+       next open. `max-age` alone keeps that promise — within 30 s a repeat
+       open is served from the browser cache, after that it must ask again.
+       The old `stale-while-revalidate=300` broke it: for five minutes the
+       browser answered the app's fetch INSTANTLY WITH THE STALE COPY and
+       revalidated in the background, and the app never re-read, so a
+       renamed product kept its old name for the whole session. The warm
+       snapshot still paints first, so nothing waits on this request. */
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header },
+      headers: { "Cache-Control": "private, max-age=30", "Server-Timing": header },
     });
   }
 
@@ -235,10 +370,15 @@ export async function GET(req: Request) {
     _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load products" }, { status: 500 });
   }
-  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: (data ?? []).length });
+  const products = (data ?? []) as unknown as Record<string, unknown>[];
+  if (listView) {
+    const now = Date.now();
+    for (const r of products) foldFreshness(r, now);
+  }
+  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: products.length });
   return NextResponse.json(
-    { products: data ?? [] },
-    { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=900", "Server-Timing": header } },
+    { products },
+    { headers: { "Cache-Control": "private, max-age=60", "Server-Timing": header } },
   );
 }
 
@@ -274,5 +414,6 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products", "taxonomy"]);
   return NextResponse.json({ product: data });
 }

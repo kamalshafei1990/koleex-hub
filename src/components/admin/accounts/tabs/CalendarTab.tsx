@@ -35,7 +35,7 @@ import {
 } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { useTranslation } from "@/lib/i18n";
-import { accountsT } from "@/lib/translations/accounts";
+import { calendarPrefsT } from "@/lib/translations/calendar-prefs";
 import { useSkin } from "@/lib/appearance";
 import {
   tabCardClass,
@@ -54,7 +54,7 @@ interface Props {
 }
 
 export default function CalendarTab({ account, onChanged }: Props) {
-  const { t } = useTranslation(accountsT);
+  const { t } = useTranslation(calendarPrefsT);
   const aurora = useSkin() === "aurora";
   const initial = useMemo(
     () => withDefaults(account.preferences),
@@ -66,7 +66,14 @@ export default function CalendarTab({ account, onChanged }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setPrefs(initial), [initial]);
+  /* Follow the account only while there are no unsaved edits — the old
+     effect replaced the form on every refresh, so a photo upload elsewhere
+     wiped half-typed working hours. Done during render, so no stale frame. */
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (JSON.stringify(prefs) === JSON.stringify(seenInitial)) setPrefs(initial);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -93,7 +100,10 @@ export default function CalendarTab({ account, onChanged }: Props) {
   async function save() {
     setSaving(true);
     setError(null);
-    const ok = await updateAccountPreferences(account.id, prefs);
+    /* The calendar slice ONLY (Settings audit, 29/09/2026): sending the whole
+       withDefaults copy wrote this screen's stale language, My apps, pause,
+       wallpaper… back over newer values. */
+    const ok = await updateAccountPreferences(account.id, { calendar: prefs.calendar });
     setSaving(false);
     if (!ok) {
       setError(t("acc.err.calendarFailed"));

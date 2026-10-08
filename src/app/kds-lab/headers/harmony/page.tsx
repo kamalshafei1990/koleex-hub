@@ -38,9 +38,12 @@ const TABS = ["All", "Customers", "Suppliers", "Companies"];
 function SystemBar({ appName, compact }: { appName?: string; compact?: React.ReactNode }) {
   return (
     <div className="flex h-14 items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 md:px-5">
-      <span className="flex shrink-0 items-baseline gap-1.5">
-        <span className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">KOLEEX</span>
-        <span className="text-[13px] italic text-[#7FA9D6]">hub</span>
+      {/* The real Koleex Hub lockup, same files as MainHeader. */}
+      <span className="flex shrink-0 items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/hub-logo/koleex-hub-logo-for-light-e.webp" alt="Koleex Hub" width={640} height={70} className="h-[15px] w-auto dark:hidden" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/hub-logo/koleex-hub-logo-for-dark-e.webp" alt="Koleex Hub" width={640} height={70} className="hidden h-[15px] w-auto dark:block" draggable={false} />
       </span>
       {appName && (
         <>

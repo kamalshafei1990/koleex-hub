@@ -96,7 +96,7 @@ export interface WallpaperPref {
 
 /** The wave field's own palette, so the still Koleex grounds are demonstrably
  *  the same family rather than a designer's approximation of it. Kept in sync
- *  by hand with PALETTES in WavyBackground.tsx — five stops, brightest first. */
+ *  by hand with AURORA_PALETTES in lib/aurora-field.ts — five stops, brightest first. */
 const HUB = ["#BCD8F0", "#8FB0D4", "#567FB2", "#2E4B6B", "#1B2A3C"] as const;
 
 export const DEFAULT_WALLPAPER_ID = "hub-live";

@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -73,5 +74,6 @@ export async function POST(req: Request) {
     console.error("[api/product-media POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ media: data });
 }

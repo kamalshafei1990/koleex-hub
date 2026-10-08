@@ -50,9 +50,11 @@ interface Props {
      source of truth. Optional because other callers of the section
      (if any land later) don't need it. */
   onEditInHero?: () => void;
-  /* Product-level packing defaults (schema products) — offered as a
-     one-click copy on every variant card's packing panel. */
-  productPacking?: ProductPackingDefaults | null;
+  /* Packing & shipping left this tab on 2026-09-22: a model's crates are
+     entered on the Packing & Logistics tab with that model selected in the
+     family strip (product_models.logistics_overrides). The card only points
+     there; this jumps to that tab with the model pre-selected. */
+  onOpenPacking?: (idx: number) => void;
   productSpecs?: Record<string, unknown>;
   /* Family Phase 3 — per-model photo plumbing (media lives in the form). */
   modelPhotoUrl?: (m: { _tempId: string; id?: string }) => string | null;
@@ -103,22 +105,13 @@ function ReadOnlyField({
   );
 }
 
-export type ProductPackingDefaults = {
-  packing_type?: string; carton_dimensions?: string; cbm?: string;
-  net_weight?: string; gross_weight?: string;
-  container_20ft_qty?: string; container_40ft_qty?: string; container_40hq_qty?: string;
-};
-
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
-  onEditInHero, primaryModel, productPacking, specFields = [], productSpecs,
+  onEditInHero, onOpenPacking, specFields = [], productSpecs,
   photoUrl, onSetPhoto, onRemovePhoto,
 }: {
   model: ModelFormState; idx: number; total: number;
-  /* The product's primary variant (models[0]). Non-primary variants
-     inherit packing & logistics from it unless they override. */
-  primaryModel?: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -134,10 +127,9 @@ function ModelCard({
   /* Callback for the primary model's "Edit in Hero" jump — see Props
      comment on ModelsSection. Ignored for non-primary variants. */
   onEditInHero?: () => void;
+  /* Jump to the Packing & Logistics tab with THIS model selected. */
+  onOpenPacking?: () => void;
   specFields?: VariantSpecField[];
-  /* Product-level packing entered on the Logistics tab (schema products).
-     One click copies it here — the SAME data must never be typed twice. */
-  productPacking?: ProductPackingDefaults | null;
   /* The FAMILY's spec values (products.schema_specs). Shown greyed beside
      every override row so "change only the difference" is never blind —
      you see what you are overriding while you type. */
@@ -157,21 +149,6 @@ function ModelCard({
   };
 
   const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
-  /* ── Variant packing auto-derivation (mirrors the product-level Logistics
-   behaviour): carton dims (cm) → CBM → container quantities. Every derived
-   field stays editable — typing over a computed value wins. Practical usable
-   volumes (28 / 58 m³), not brochure volumes. */
-const cbmFromCartonCm = (raw: string): number | null => {
-  const nums = (raw.match(/\d+(?:\.\d+)?/g) ?? []).map(Number).filter((n) => n > 0);
-  if (nums.length < 3) return null;
-  const cbm = (nums[0] * nums[1] * nums[2]) / 1_000_000; // cm³ → m³
-  return Number.isFinite(cbm) && cbm > 0 ? Math.round(cbm * 10000) / 10000 : null;
-};
-const containerQtysFromCbm = (cbm: number) => ({
-  c20: Math.max(0, Math.floor(28 / cbm)),
-  c40: Math.max(0, Math.floor(58 / cbm)),
-  c40hq: Math.max(0, Math.floor(68 / cbm)),
-});
 
 const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1.5";
 
@@ -183,50 +160,6 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
     ref: model.reference_model || null,
   });
 
-  /* ── Packing & logistics inheritance ──
-     Variants of the same machine almost always ship in the same box.
-     Non-primary variants inherit packing/logistics from the primary
-     variant unless they explicitly override. "All these fields empty"
-     = inheriting; the operator only fills them for the rare variant
-     that's a genuinely different size. */
-  const LOGI_KEYS = [
-    "net_weight", "weight", "cbm", "carton_dimensions", "packing_type",
-    "box_include", "extra_accessories", "container_20ft_qty", "container_40ft_qty", "container_40hq_qty",
-  ] as const;
-  const canInherit = !isPrimary && !solo && !!primaryModel;
-  /* Override is explicit state (not just "has values") so Customize works
-     even when the primary variant has no packing entered yet. Defaults ON
-     for variants that already carry their own logistics. */
-  const [customizing, setCustomizing] = useState<boolean>(
-    () => LOGI_KEYS.some((k) => String((model[k] ?? "") as string).trim() !== ""),
-  );
-  const inheritingLogistics = canInherit && !customizing;
-  const customizeLogistics = () => {
-    if (primaryModel) {
-      const u: Partial<ModelFormState> = {};
-      LOGI_KEYS.forEach((k) => { (u as Record<string, unknown>)[k] = primaryModel[k] ?? ""; });
-      onUpdate(u);
-    }
-    setCustomizing(true);
-  };
-  const revertLogistics = () => {
-    const u: Partial<ModelFormState> = {};
-    LOGI_KEYS.forEach((k) => { (u as Record<string, unknown>)[k] = ""; });
-    onUpdate(u);
-    setCustomizing(false);
-  };
-  const pmLogiSummary = (() => {
-    const pm = primaryModel;
-    if (!pm) return "";
-    const parts: string[] = [];
-    if (pm.net_weight) parts.push(`NW ${pm.net_weight}kg`);
-    if (pm.weight) parts.push(`GW ${pm.weight}kg`);
-    if (pm.cbm) parts.push(`${pm.cbm} m³`);
-    if (pm.carton_dimensions) parts.push(pm.carton_dimensions);
-    if (pm.packing_type) parts.push(pm.packing_type);
-    if (pm.container_20ft_qty || pm.container_40ft_qty || pm.container_40hq_qty) parts.push(`${pm.container_20ft_qty || "–"}/${pm.container_40ft_qty || "–"}/${pm.container_40hq_qty || "–"} per 20'/40'/40HQ`);
-    return parts.join(" · ");
-  })();
 
   return (
     <div className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)]">
@@ -688,134 +621,28 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   triggerClassName="h-8 w-full rounded-lg border border-dashed border-[var(--border-subtle)] bg-transparent ps-2 pe-7 text-[12px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)] text-start"
                 />
                 <p className="text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
-                  Everything not listed here is inherited from the product's Specifications tab.
+                  Everything not listed here is inherited from the product&apos;s Specifications tab.
                 </p>
               </div>
             </Panel>
           )}
 
-          {/* Packaging & Logistics panel — these are PACKED/SHIPMENT
-              dimensions, distinct from the bare-machine dimensions and
-              weight that live on the Technical step. Net + Gross weight
-              both render here so admins can fill the standard
-              NW / GW pair shown on every commercial invoice. */}
-          <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Shipping & Packing (this variant)">
-            {inheritingLogistics ? (
-              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] inline-flex items-center gap-1.5">
-                    <PackageIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" /> Same packing &amp; logistics as the primary variant
-                  </span>
-                  <button type="button" onClick={customizeLogistics} className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline shrink-0">
-                    Customize for this variant
-                  </button>
-                </div>
-                <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">
-                  {pmLogiSummary || "Primary variant has no packing data yet — fill it on the primary variant card."}
-                </p>
-              </div>
-            ) : (
-            <>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] text-[var(--text-ghost)] italic">
-                {t("mv.packingIntro", "Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.")}
-              </p>
-              <div className="flex items-center gap-3 shrink-0 ml-2">
-                {productPacking && Object.values(productPacking).some(Boolean) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const u: Record<string, string> = {};
-                      for (const [k, v] of Object.entries(productPacking)) if (v) u[k] = v;
-                      onUpdate(u as Partial<ModelFormState>);
-                    }}
-                    className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  >
-                    {t("mv.copyFromLogistics", "⤓ Copy from product Logistics")}
-                  </button>
-                )}
-                {canInherit && (
-                  <button type="button" onClick={revertLogistics} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                    {t("mv.usePrimaryPacking", "Use primary variant's packing")}
-                  </button>
-                )}
-              </div>
-            </div>
-            {/* Entry order mirrors real packing logic: HOW it's packed →
-                carton size → volume (auto) → weights. Same sequence as the
-                product-level Logistics tab. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={lbl}>{t("mv.packingType", "Packing Type")}</label>
-                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder={t("mv.phPackingType", "e.g. Wooden crate")} className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>{t("mv.cartonDims", "Carton Dimensions (L × W × H)")}</label>
-                <input
-                  type="text"
-                  value={model.carton_dimensions}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    const cbm = cbmFromCartonCm(v);
-                    if (cbm != null) {
-                      const q = containerQtysFromCbm(cbm);
-                      onUpdate({ carton_dimensions: v, cbm: String(cbm), container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40), container_40hq_qty: String(q.c40hq) });
-                    } else {
-                      onUpdate({ carton_dimensions: v });
-                    }
-                  }}
-                  placeholder={t("mv.phCarton", "e.g. 60 × 50 × 65 cm")}
-                  className={inp}
-                />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintDims", "↻ Fills CBM + container loading automatically (cm).")}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-              <div>
-                <label className={lbl}>{t("mv.packedCbm", "Packed CBM (m³)")}</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={model.cbm}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    const n = Number(v);
-                    if (Number.isFinite(n) && n > 0) {
-                      const q = containerQtysFromCbm(n);
-                      onUpdate({ cbm: v, container_20ft_qty: String(q.c20), container_40ft_qty: String(q.c40), container_40hq_qty: String(q.c40hq) });
-                    } else {
-                      onUpdate({ cbm: v });
-                    }
-                  }}
-                  placeholder="0.0000"
-                  className={inp}
-                />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAutoCbm", "↻ Auto from carton dims — you can also type it manually.")}</p>
-              </div>
-              <div>
-                <label className={lbl}>{t("mv.netWeight", "Net Weight (kg)")}</label>
-                <input type="number" step="0.1" value={model.net_weight} onChange={(e) => onUpdate({ net_weight: e.target.value })} placeholder="0.0" className={inp} />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintBare", "Bare machine, no packaging.")}</p>
-              </div>
-              <div>
-                <label className={lbl}>{t("mv.grossWeight", "Gross Weight (kg)")}</label>
-                <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintGross", "Includes crate + accessories.")}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-              <div>
-                <label className={lbl}>{t("mv.boxIncludes", "Box Includes")}</label>
-                <input type="text" value={model.box_include} onChange={(e) => onUpdate({ box_include: e.target.value })} placeholder={t("mv.phBoxIncludes", "e.g. Main unit, cable, manual")} className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>{t("mv.extraAccessories", "Extra Accessories")}</label>
-                <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder={t("mv.phExtras", "e.g. Spare parts kit")} className={inp} />
-              </div>
-            </div>
-            </>
+          {/* Packing & shipping LEFT this card on 2026-09-22. It used to ask
+              the same crate questions the Packing & Logistics tab asks, in a
+              second set of columns, so one model could carry two different
+              answers. A model's crates are entered on that tab with the model
+              selected in the family strip; this card only points there. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+              <PackageIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+              {t("mv.packingMoved", "Packing, weights and container loading for this model are entered on the Packing & Logistics tab, with the model selected in the family strip.")}
+            </span>
+            {onOpenPacking && (
+              <button type="button" onClick={onOpenPacking} className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline shrink-0">
+                {t("mv.openPacking", "Open Packing & Logistics")}
+              </button>
             )}
-          </Panel>
+          </div>
 
           {/* Advanced (MOQ / Lead Time / Container loading / Barcode) */}
           <details className="group">
@@ -839,31 +666,6 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder={t("mv.phBarcode", "Leave empty = auto from SKU")} className={`${inp} font-mono`} />
                 </div>
               </div>
-              {/* Container loading — units that fit in standard
-                  20'/40' ocean containers. Used by the logistics
-                  team to quote FCL pricing. Inherited from the primary
-                  variant when packing is inherited. */}
-              {inheritingLogistics ? (
-                <p className="text-[11px] text-[var(--text-ghost)] italic">{t("mv.containerInherited", "Container loading inherited from the primary variant.")}</p>
-              ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={lbl}>{t("mv.c20", "Container 20' (units)")}</label>
-                  <input type="number" value={model.container_20ft_qty} onChange={(e) => onUpdate({ container_20ft_qty: e.target.value })} placeholder="e.g. 120" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAuto20", "↻ Auto from CBM — overtype if units stack.")}</p>
-                </div>
-                <div>
-                  <label className={lbl}>{t("mv.c40", "Container 40' (units)")}</label>
-                  <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAuto40", "↻ Auto from CBM (standard 40').")}</p>
-                </div>
-                <div>
-                  <label className={lbl}>{t("mv.c40hq", "Container 40'HQ (units)")}</label>
-                  <input type="number" value={model.container_40hq_qty} onChange={(e) => onUpdate({ container_40hq_qty: e.target.value })} placeholder="e.g. 320" className={inp} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("mv.hintAutoHq", "↻ Auto from CBM (High-Cube).")}</p>
-                </div>
-              </div>
-              )}
             </div>
           </details>
 
@@ -877,7 +679,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
   );
 }
 
-export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, productPacking, productSpecs, modelPhotoUrl, onSetModelPhoto, onRemoveModelPhoto }: Props) {
+export default function ModelsSection({ models, onChange, specFields = [], suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero, onOpenPacking, productSpecs, modelPhotoUrl, onSetModelPhoto, onRemoveModelPhoto }: Props) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
@@ -974,7 +776,6 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
             return (
               <ModelCard
                 specFields={specFields}
-                productPacking={productPacking}
                 productSpecs={productSpecs}
                 photoUrl={modelPhotoUrl ? modelPhotoUrl(m) : null}
                 onSetPhoto={onSetModelPhoto ? (f: File) => onSetModelPhoto(m, f) : undefined}
@@ -994,7 +795,7 @@ export default function ModelsSection({ models, onChange, specFields = [], suppl
                 onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
                 defaultOpen={i === 0}
                 onEditInHero={onEditInHero}
-                primaryModel={models[0]}
+                onOpenPacking={onOpenPacking ? () => onOpenPacking(trueIdx) : undefined}
               />
             );
           })}

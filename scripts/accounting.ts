@@ -22,7 +22,7 @@
      12  postExpense (unpaid)               →  Dr 5000, Cr 2000
      13  postExpense category hint maps to 5100 (banking)
      14  postOpeningBalance: asset positive →  Dr asset, Cr 3000
-     15  postBankMovement (inflow)          →  Dr 1010, Cr suspense
+     15  postBankMovement (inflow)          →  Dr 1010, Cr 1090 clearing
      16  Double-post idempotency: same source_id returns existing
      17  Trial balance: debit total = credit total
      18  Trial balance: signed balances follow normal_balance
@@ -109,7 +109,7 @@ async function seedFinanceData(tenant: string) {
   await supabase.from("finance_expenses").insert({
     id: unpaidExpenseId, tenant_id: tenant,
     category_id: null, title: "Pending invoice", amount: 800, currency: "USD",
-    expense_date: "2026-05-04", payment_status: "unpaid", approval_status: "submitted",
+    expense_date: "2026-05-04", payment_status: "unpaid", approval_status: "approved",
   });
   /* Expense with banking category — exercises EXPENSE_CATEGORY_HINTS. */
   const bankExpenseId = randomUUID();
@@ -333,10 +333,10 @@ async function main() {
           .eq("entry_id", movRes.entry_id)).data
       : null;
     const movRows = (movLines as Array<{ debit: number; credit: number; account: { code: string } }> | null) ?? [];
-    ok("15 postBankMovement (inflow) → Dr 1010, Cr suspense (3000)",
+    ok("15 postBankMovement (inflow) → Dr 1010, Cr 1090 bank clearing",
       movRes.ok &&
       movRows.find((l) => Number(l.debit)  > 0)?.account.code === "1010" &&
-      movRows.find((l) => Number(l.credit) > 0)?.account.code === "3000");
+      movRows.find((l) => Number(l.credit) > 0)?.account.code === "1090");
 
     /* 16 — idempotency: re-posting the same payment returns the same
        entry without inserting a duplicate. */

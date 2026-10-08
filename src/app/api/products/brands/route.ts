@@ -14,6 +14,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess } from "@/lib/server/product-access";
 
@@ -64,6 +65,7 @@ export async function PATCH(req: Request) {
     console.error("[api/products brands PATCH]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }
 
@@ -81,5 +83,6 @@ export async function DELETE(req: Request) {
     console.error("[api/products brands DELETE]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

@@ -10,6 +10,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type {
   BalanceWithRefs,
   ColorToken,
@@ -21,6 +22,7 @@ import type {
   InventoryItemType,
   InventoryItemWithRefs,
 } from "./types";
+import { isLowStock } from "@/lib/inventory/low-stock";
 
 /* ─── Balances ────────────────────────────────────────────────── */
 
@@ -230,30 +232,70 @@ export async function buildMovementHistory(opts: {
 
 /* ─── Items list (with enrichment) ───────────────────────── */
 
+/** The items that are low in at least one warehouse — the ONE rule of
+ *  lib/inventory/low-stock (reorder point, else the minimum), read from the
+ *  balances as the dashboard counts them. An item never stocked has no
+ *  balance, so it is not listed. */
+export async function lowStockItemIds(tenantId: string): Promise<string[]> {
+  const { data, error } = await allRows(supabaseServer
+    .from("inventory_stock_balances")
+    .select("inventory_item_id, qty_on_hand, inventory_items!inner(reorder_point, min_stock, track_stock, deleted_at)")
+    .eq("tenant_id", tenantId)
+    .order("id"), "stock balances");
+  if (error) throw new Error(error.message);
+  type Limits = { reorder_point: number | null; min_stock: number | null; track_stock: boolean | null; deleted_at: string | null };
+  const rows = (data ?? []) as unknown as Array<{ inventory_item_id: string; qty_on_hand: number; inventory_items: Limits | Limits[] | null }>;
+  const low = new Set<string>();
+  for (const row of rows) {
+    const item = Array.isArray(row.inventory_items) ? row.inventory_items[0] ?? null : row.inventory_items;
+    if (item && !item.deleted_at && isLowStock(row.qty_on_hand, item)) low.add(row.inventory_item_id);
+  }
+  return Array.from(low);
+}
+
 export async function listInventoryItems(opts: {
   tenantId: string;
   search?: string;
   typeId?: string;
   status?: "active" | "inactive" | "archived";
   limit?: number;
+  /** Only the items low in some warehouse (the dashboard's and the alert's rule). */
+  lowStock?: boolean;
 }): Promise<InventoryItemWithRefs[]> {
   const limit = Math.min(opts.limit ?? 200, 1000);
-  let q = supabaseServer
-    .from("inventory_items")
-    .select("*")
-    .eq("tenant_id", opts.tenantId)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(limit);
-  if (opts.typeId) q = q.eq("item_type_id", opts.typeId);
-  if (opts.status) q = q.eq("status", opts.status);
-  if (opts.search) {
-    const s = opts.search.replace(/[%_]/g, "\\$&");
-    q = q.or(`item_name.ilike.%${s}%,item_code.ilike.%${s}%,brand.ilike.%${s}%,sku.ilike.%${s}%`);
+  /* The low items are found from the balances first, so none is missed
+     behind the list's limit; ids go to the database a hundred at a time. */
+  const lowIds = opts.lowStock ? await lowStockItemIds(opts.tenantId) : null;
+  if (lowIds && lowIds.length === 0) return [];
+  const base = () => {
+    let q = supabaseServer
+      .from("inventory_items")
+      .select("*")
+      .eq("tenant_id", opts.tenantId)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (opts.typeId) q = q.eq("item_type_id", opts.typeId);
+    if (opts.status) q = q.eq("status", opts.status);
+    if (opts.search) {
+      const s = opts.search.replace(/[%_]/g, "\\$&");
+      q = q.or(`item_name.ilike.%${s}%,item_code.ilike.%${s}%,brand.ilike.%${s}%,sku.ilike.%${s}%`);
+    }
+    return q;
+  };
+  let items: InventoryItem[] = [];
+  if (lowIds) {
+    for (let i = 0; i < Math.min(lowIds.length, 1000); i += 100) {
+      const { data, error } = await base().in("id", lowIds.slice(i, i + 100));
+      if (error) throw new Error(error.message);
+      items.push(...((data ?? []) as InventoryItem[]));
+    }
+    items = items.sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""))).slice(0, limit);
+  } else {
+    const { data, error } = await base();
+    if (error) throw new Error(error.message);
+    items = (data ?? []) as InventoryItem[];
   }
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  const items = (data ?? []) as InventoryItem[];
   if (items.length === 0) return [];
 
   const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
@@ -536,30 +578,10 @@ export async function buildInventoryOperatorSummary(
         .then((r) => r.count ?? 0),
       0,
     ),
-    /* low stock — count balances where qty_on_hand <= item.reorder_point > 0 */
-    safe(
-      supabaseServer
-        .from("inventory_stock_balances")
-        .select("inventory_item_id, qty_on_hand, inventory_items!inner(reorder_point)")
-        .eq("tenant_id", tenantId)
-        .then((r) => {
-          const rows = (r.data ?? []) as unknown as Array<{
-            inventory_item_id: string;
-            qty_on_hand: number;
-            inventory_items: { reorder_point: number | null } | Array<{ reorder_point: number | null }> | null;
-          }>;
-          const seen = new Set<string>();
-          for (const row of rows) {
-            const linked = Array.isArray(row.inventory_items)
-              ? row.inventory_items[0] ?? null
-              : row.inventory_items;
-            const rp = Number(linked?.reorder_point ?? 0);
-            if (rp > 0 && Number(row.qty_on_hand) <= rp) seen.add(row.inventory_item_id);
-          }
-          return seen.size;
-        }),
-      0,
-    ),
+    /* low stock — the items low in some warehouse, by the ONE rule the
+       alert and the Items list use (lib/inventory/low-stock: the reorder
+       point, else the minimum). */
+    safe(lowStockItemIds(tenantId).then((ids) => ids.length), 0),
     /* expired batches with remaining stock */
     safe(
       supabaseServer
@@ -635,13 +657,13 @@ export async function buildInventoryOperatorSummary(
     ),
     /* intel: last 30d movements for fastest + busiest warehouse */
     safe(
-      supabaseServer
+      allRows(supabaseServer
         .from("inventory_stock_movements")
         .select("inventory_item_id, warehouse_id, movement_date")
         .eq("tenant_id", tenantId)
         .eq("status", "posted")
         .gte("movement_date", thirtyDaysAgo.slice(0, 10))
-        .limit(2000)
+        .order("id"), "recent movements")
         .then((r) => r.data ?? []),
       [] as Array<{ inventory_item_id: string; warehouse_id: string; movement_date: string }>,
     ),

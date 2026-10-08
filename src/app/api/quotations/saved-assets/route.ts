@@ -63,7 +63,11 @@ async function resolveSaved(
         return bd.localeCompare(ad);
       })[0];
     if (!match) return null;
-    return publicUrlFor(`quotation-assets/${tenantId}/${match.name}`);
+    /* The file's own version in the URL: uploads are cached for an hour, so
+       after a replace every quote kept showing the old stamp until then. */
+    const v = (match as { updated_at?: string }).updated_at;
+    const url = publicUrlFor(`quotation-assets/${tenantId}/${match.name}`);
+    return v ? `${url}?v=${encodeURIComponent(v)}` : url;
   };
   return { stampUrl: find("stamp"), signatureUrl: find("signature") };
 }
@@ -81,7 +85,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   /* Gate to super-admin only — these assets are tenant-wide and a
      regular sales rep should not be able to replace the CEO's
@@ -108,6 +112,10 @@ export async function POST(req: Request) {
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: "Missing file." }, { status: 400 });
   }
+  /* The screen caps it at 4 MB; the server now does too. */
+  if (file.size > 4 * 1024 * 1024) {
+    return NextResponse.json({ error: "Image too large (max 4 MB)." }, { status: 413 });
+  }
 
   /* Sniff a safe extension. File names can be anything (Safari sends
      "image.jpg" for a screenshot pasted from clipboard), so we map
@@ -128,19 +136,7 @@ export async function POST(req: Request) {
     );
   }
 
-  /* Clean up any stale siblings (different extensions) — `list()`
-     would otherwise return both and force resolveSaved to pick one. */
   const folder = `quotation-assets/${auth.tenant_id}`;
-  const { data: existing } = await supabaseServer.storage
-    .from(BUCKET)
-    .list(folder, { limit: 100 });
-  const stale = (existing ?? [])
-    .filter((o) => o.name.startsWith(`${kind}.`) && o.name !== `${kind}.${ext}`)
-    .map((o) => `${folder}/${o.name}`);
-  if (stale.length > 0) {
-    await supabaseServer.storage.from(BUCKET).remove(stale);
-  }
-
   const path = pathFor(auth.tenant_id, kind, ext);
   const bytes = new Uint8Array(await (file as Blob).arrayBuffer());
   const { error: upErr } = await supabaseServer.storage
@@ -154,6 +150,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
 
+  /* Stale siblings (the same kind under another extension) go only AFTER the
+     new file is safely stored — removing them first meant a failed upload
+     lost the company's stamp or signature altogether. */
+  const { data: existing } = await supabaseServer.storage
+    .from(BUCKET)
+    .list(folder, { limit: 100 });
+  const stale = (existing ?? [])
+    .filter((o) => o.name.startsWith(`${kind}.`) && o.name !== `${kind}.${ext}`)
+    .map((o) => `${folder}/${o.name}`);
+  if (stale.length > 0) {
+    await supabaseServer.storage.from(BUCKET).remove(stale);
+  }
+
   /* Append a cache-buster query-string so the editor immediately
      shows the new asset rather than a cached older copy. */
   const url = `${publicUrlFor(path)}?v=${Date.now()}`;
@@ -161,7 +170,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   if (!auth.is_super_admin) {
     return NextResponse.json(

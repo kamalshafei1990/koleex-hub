@@ -5,7 +5,6 @@
    bundle tiny and the chart styles match the Hub's minimal look. */
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -16,21 +15,18 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 export default function ReportsModule({ t }: SalesModuleProps) {
   const [invoices, setInvoices] = useState<{ total: number | null; issued_at: string | null; created_at: string }[]>([]);
   const [opps, setOpps] = useState<{ value: number | null; stage_id: string | null; is_won: boolean | null; is_lost: boolean | null }[]>([]);
-  const [stages, setStages] = useState<{ id: string; name: string; sort_order: number }[]>([]);
+  const [stages, setStages] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [iR, oR, sR] = await Promise.all([
-        supabase.from("invoices").select("total,issued_at,created_at"),
-        supabase.from("crm_opportunities").select("value,stage_id,is_won,is_lost"),
-        supabase.from("crm_stages").select("id,name,sort_order").order("sort_order", { ascending: true }),
-      ]);
-      if (cancelled) return;
-      setInvoices((iR.data ?? []) as typeof invoices);
-      setOpps((oR.data ?? []) as typeof opps);
-      setStages((sR.data ?? []) as typeof stages);
+      const res = await fetch("/api/sales/overview?module=reports", { credentials: "include" });
+      const json = res.ok ? await res.json() : null;
+      if (cancelled || !json) return;
+      setInvoices((json.invoices ?? []) as typeof invoices);
+      setOpps((json.opps ?? []) as typeof opps);
+      setStages((json.stages ?? []) as typeof stages);
       setLoading(false);
     })();
     return () => { cancelled = true; };

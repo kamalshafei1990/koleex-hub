@@ -1,3 +1,5 @@
-"use client";
-import OperationalReports from "@/components/reports/OperationalReports";
-export default function Page() { return <OperationalReports />; }
+import ReportsApp from "@/components/reports/app/ReportsApp";
+
+export default function ReportsPage() {
+  return <ReportsApp />;
+}

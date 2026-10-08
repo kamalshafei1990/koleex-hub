@@ -20,7 +20,7 @@
    only the removed queries used are gone with it. See fetchEmployeeActivity
    for what that fixed. */
 
-import { cachedGet } from "./client-cache";
+import { cachedGet, invalidateCachedGet } from "./client-cache";
 import { generateTemporaryPassword } from "./accounts-admin";
 import type {
   PersonRow,
@@ -55,6 +55,9 @@ export interface EmployeeListItem {
   work_email: string | null;
   work_phone: string | null;
   work_location: string;
+  /** Direct manager (koleex_employees.manager_id) — Phase B reads it to say
+      whether a leave request has a manager step in front of HR. */
+  manager_id: string | null;
   department_name: string | null;
   position_title: string | null;
   department_id: string | null;
@@ -93,6 +96,8 @@ export interface EmployeeWizardData {
   work_email: string;
   work_phone: string;
   work_location: string;
+  /** Phase C: ISO alpha-2 of the country the employee works in (calendar + attendance policy). */
+  work_country: string;
 
   // Department & Position
   department_id: string;
@@ -215,6 +220,7 @@ export function emptyWizardData(): EmployeeWizardData {
     work_email: "",
     work_phone: "",
     work_location: "office",
+    work_country: "",
     department_id: "",
     department_name: "",
     position_id: "",
@@ -371,9 +377,12 @@ export async function fetchEmployeeList(
 ): Promise<EmployeeListItem[]> {
   try {
     const url = opts.activeOnly ? "/api/employees?activeOnly=1" : "/api/employees";
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) return [];
-    const json = (await res.json()) as { employees: EmployeeListItem[] };
+    /* Coalesced + 15 s reuse (lib/client-cache): the Employees page mounts
+       this fetch twice under StrictMode and pickers mount it again —
+       measured ×2 in parallel at 2.1 s each from China (2026-10-08). Every
+       mutation in this file invalidates the "/api/employees" prefix, so the
+       reuse window never serves a stale roster after an edit. */
+    const json = await cachedGet<{ employees?: EmployeeListItem[] }>(url, 15_000);
     return json.employees ?? [];
   } catch (e) {
     console.error("[Employees] Fetch:", e);
@@ -553,6 +562,7 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
     } catch {
       return { success: false, error: `Server returned ${res.status}.` };
     }
+    if (json.success) invalidateCachedGet("/api/employees");
     return json;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Network error";
@@ -595,6 +605,7 @@ export async function updateEmployee(
     });
     const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
     if (!res.ok) return { ok: false, error: json?.error ?? `Server returned ${res.status}` };
+    invalidateCachedGet("/api/employees");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Network error" };
@@ -616,6 +627,7 @@ export async function deleteEmployee(
       | { ok?: boolean; error?: string; accountSuspended?: boolean }
       | null;
     if (!res.ok) return { ok: false, error: json?.error ?? `Server returned ${res.status}` };
+    invalidateCachedGet("/api/employees");
     return { ok: true, accountSuspended: json?.accountSuspended };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Network error" };
@@ -696,7 +708,9 @@ export async function updateFullEmployee(
       body: JSON.stringify({ ...data, employee_id: employeeId }),
     });
     try {
-      return (await res.json()) as CreateEmployeeResult;
+      const json = (await res.json()) as CreateEmployeeResult;
+      if (json.success) invalidateCachedGet("/api/employees");
+      return json;
     } catch {
       return { success: false, error: `Server returned ${res.status}.` };
     }
@@ -749,6 +763,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
     work_email: s(emp.work_email),
     work_phone: s(emp.work_phone),
     work_location: s(emp.work_location) || "office",
+    work_country: s(emp.work_country),
 
     department_id: p.assignment?.department_id ?? "",
     position_id: p.assignment?.position_id ?? "",

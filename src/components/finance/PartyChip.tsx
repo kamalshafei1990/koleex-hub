@@ -13,7 +13,7 @@ import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PARTY } from "@/lib/translations/finance/party";
 
 export interface PartyChipData {
   id?: string | null;
@@ -46,7 +46,7 @@ export default function PartyChip({
   placeholder?: string;
   compact?: boolean;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_PARTY);
   if (!party || !party.name?.trim()) {
     return (
       <button

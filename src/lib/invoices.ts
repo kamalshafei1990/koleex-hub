@@ -1,8 +1,9 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   invoices — client-side fetchers + shared types for the Invoices app.
-   Every call is cookie-authenticated via /api/invoices/*.
+   invoices — the invoice list fetch + shared types, for the invoice strip
+   on a contact (EntityInvoicesStrip). Cookie-authenticated via /api/invoices.
+   The Invoices app itself is the document editor (components/invoices-doc).
    --------------------------------------------------------------------------- */
 
 export type InvoiceStatus =
@@ -49,34 +50,6 @@ export interface InvoiceRow {
     phones?: unknown;
     addresses?: unknown;
   } | null;
-}
-
-export interface InvoiceItem {
-  id: string;
-  invoice_id: string;
-  product_id: string | null;
-  description: string | null;
-  qty: number;
-  unit_price: number;
-  tax_rate: number;
-  line_discount_percent: number;
-  line_total: number;
-  sort_order: number;
-}
-
-export interface InvoicePayment {
-  id: string;
-  tenant_id: string;
-  invoice_id: string;
-  amount: number;
-  currency: string;
-  method: string | null;
-  reference: string | null;
-  received_at: string;
-  notes: string | null;
-  recorded_by_account_id: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export const STATUS_COLOR: Record<InvoiceStatus, string> = {
@@ -129,106 +102,4 @@ export async function fetchInvoices(params: {
   if (!res.ok) return [];
   const { invoices } = (await res.json()) as { invoices: InvoiceRow[] };
   return invoices ?? [];
-}
-
-export async function fetchInvoice(id: string): Promise<{ invoice: InvoiceRow; items: InvoiceItem[]; payments: InvoicePayment[] } | null> {
-  const res = await fetch(`/api/invoices/${id}`, { credentials: "include" });
-  if (!res.ok) return null;
-  return (await res.json()) as { invoice: InvoiceRow; items: InvoiceItem[]; payments: InvoicePayment[] };
-}
-
-export async function createInvoice(body: {
-  customer_id?: string | null;
-  currency?: string;
-  issue_date?: string;
-  due_date?: string | null;
-  tax_rate?: number;
-  discount_percent?: number;
-  notes?: string | null;
-  terms?: string | null;
-  payment_terms?: string | null;
-  linked_quotation_id?: string | null;
-  linked_project_id?: string | null;
-  lines?: Partial<InvoiceItem>[];
-}): Promise<InvoiceRow | null> {
-  const res = await fetch("/api/invoices", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { invoice } = (await res.json()) as { invoice: InvoiceRow };
-  return invoice;
-}
-
-export async function updateInvoice(
-  id: string,
-  patch: Partial<InvoiceRow>,
-): Promise<InvoiceRow | null> {
-  const res = await fetch(`/api/invoices/${id}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) return null;
-  const { invoice } = (await res.json()) as { invoice: InvoiceRow };
-  return invoice;
-}
-
-export async function deleteInvoice(id: string): Promise<boolean> {
-  const res = await fetch(`/api/invoices/${id}`, { method: "DELETE", credentials: "include" });
-  return res.ok;
-}
-
-export async function sendInvoice(id: string): Promise<InvoiceRow | null> {
-  const res = await fetch(`/api/invoices/${id}/send`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!res.ok) return null;
-  const { invoice } = (await res.json()) as { invoice: InvoiceRow };
-  return invoice;
-}
-
-export async function saveInvoiceLines(
-  id: string,
-  body: { lines: Partial<InvoiceItem>[]; tax_rate?: number; discount_percent?: number },
-): Promise<{ invoice: InvoiceRow; items: InvoiceItem[] } | null> {
-  const res = await fetch(`/api/invoices/${id}/lines`, {
-    method: "PUT",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as { invoice: InvoiceRow; items: InvoiceItem[] };
-}
-
-export async function recordPayment(
-  id: string,
-  body: { amount: number; method?: string | null; reference?: string | null; received_at?: string; notes?: string | null; currency?: string },
-): Promise<InvoicePayment | null> {
-  const res = await fetch(`/api/invoices/${id}/payments`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { payment } = (await res.json()) as { payment: InvoicePayment };
-  return payment;
-}
-
-export async function invoiceFromQuotation(quotationId: string, dueDate?: string): Promise<InvoiceRow | null> {
-  const res = await fetch("/api/invoices/from-quotation", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quotation_id: quotationId, due_date: dueDate }),
-  });
-  if (!res.ok) return null;
-  const { invoice } = (await res.json()) as { invoice: InvoiceRow };
-  return invoice;
 }

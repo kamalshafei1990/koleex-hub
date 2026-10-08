@@ -1,6 +1,10 @@
 import type { Translations } from "@/lib/i18n";
+import { calendarPrefsT } from "@/lib/translations/calendar-prefs";
 
 export const accountsT: Translations = {
+  /* Calendar preferences live in their own small dictionary so Settings →
+     Calendar does not download all of this one (speed audit, 29/09/2026). */
+  ...calendarPrefsT,
   /* ── Page titles & headers ── */
   "acc.title":                       { en: "Accounts",                                                          zh: "账户",                                                              ar: "الحسابات" },
   "acc.subtitle":                    { en: "accounts across Koleex and customer workspaces",                     zh: "个账户，覆盖 Koleex 及客户工作区",                                       ar: "حساب عبر مساحات عمل Koleex والعملاء" },
@@ -140,7 +144,6 @@ export const accountsT: Translations = {
   "acc.msg.avatarRemoved":           { en: "Profile picture removed.",                                            zh: "头像已移除。",                                                        ar: "تمت إزالة صورة الملف الشخصي." },
   "acc.msg.accessRightsSaved":       { en: "Access rights saved.",                                                zh: "访问权限已保存。",                                                     ar: "تم حفظ صلاحيات الوصول." },
   "acc.msg.preferencesSaved":        { en: "Preferences saved.",                                                  zh: "偏好设置已保存。",                                                     ar: "تم حفظ التفضيلات." },
-  "acc.msg.calendarSaved":           { en: "Calendar preferences saved.",                                         zh: "日历偏好设置已保存。",                                                  ar: "تم حفظ تفضيلات التقويم." },
   "acc.msg.privateSaved":            { en: "Private HR data saved.",                                               zh: "私人人事数据已保存。",                                                  ar: "تم حفظ بيانات الموارد البشرية الخاصة." },
   "acc.msg.notesSaved":              { en: "Notes saved.",                                                        zh: "备注已保存。",                                                        ar: "تم حفظ الملاحظات." },
   "acc.msg.apiKeyCreated":           { en: "API key created. Copy it now \u2014 it will not be shown again.",     zh: "API 密钥已创建。请立即复制——将不会再次显示。",                             ar: "تم إنشاء مفتاح API. انسخه الآن \u2014 لن يُعرض مرة أخرى." },
@@ -164,7 +167,6 @@ export const accountsT: Translations = {
   "acc.err.canvasNotAvailable":      { en: "Canvas not available.",                                               zh: "Canvas 不可用。",                                                      ar: "Canvas غير متاح." },
   "acc.err.accessRightsFailed":      { en: "Could not save access rights. Check the console for details.",        zh: "无法保存访问权限。请查看控制台了解详情。",                                  ar: "تعذّر حفظ صلاحيات الوصول. تحقق من وحدة التحكم للحصول على التفاصيل." },
   "acc.err.preferencesFailed":       { en: "Could not save preferences.",                                         zh: "无法保存偏好设置。",                                                    ar: "تعذّر حفظ التفضيلات." },
-  "acc.err.calendarFailed":          { en: "Could not save calendar preferences.",                                zh: "无法保存日历偏好设置。",                                                 ar: "تعذّر حفظ تفضيلات التقويم." },
   "acc.err.privateFailed":           { en: "Could not save private HR data.",                                     zh: "无法保存私人人事数据。",                                                 ar: "تعذّر حفظ بيانات الموارد البشرية الخاصة." },
   "acc.err.notesFailed":             { en: "Could not save notes.",                                               zh: "无法保存备注。",                                                       ar: "تعذّر حفظ الملاحظات." },
   "acc.err.apiKeyNameRequired":      { en: "Give the key a name so you can recognise it later.",                  zh: "请为密钥命名，以便后续识别。",                                            ar: "أعطِ المفتاح اسمًا لتتمكن من التعرف عليه لاحقًا." },
@@ -313,34 +315,8 @@ export const accountsT: Translations = {
   "acc.prefs.themeLight":            { en: "Light",                                                              zh: "浅色",                                                               ar: "فاتح" },
   "acc.prefs.emailSignature":        { en: "Email Signature",                                                    zh: "邮件签名",                                                           ar: "توقيع البريد الإلكتروني" },
   "acc.prefs.signatureHint":         { en: "Appended to outgoing emails from the Koleex Hub.",                   zh: "附加到从 Koleex Hub 发出的电子邮件中。",                                 ar: "يُلحق بالرسائل الصادرة من Koleex Hub." },
-  "acc.prefs.notifications":         { en: "Notifications",                                                      zh: "通知",                                                               ar: "الإشعارات" },
-  "acc.prefs.emailNotifications":    { en: "Email notifications",                                                zh: "邮件通知",                                                           ar: "إشعارات البريد الإلكتروني" },
-  "acc.prefs.emailNotifDesc":        { en: "Send activity and mentions to the login email.",                     zh: "将活动和提及发送到登录邮箱。",                                           ar: "إرسال النشاطات والإشارات إلى البريد الإلكتروني." },
-  "acc.prefs.inAppNotifications":    { en: "In-app notifications",                                               zh: "应用内通知",                                                          ar: "الإشعارات داخل التطبيق" },
-  "acc.prefs.inAppNotifDesc":        { en: "Show a bell indicator inside the hub.",                               zh: "在 Hub 内显示铃铛提示。",                                               ar: "عرض مؤشر الجرس داخل المنصة." },
 
   /* ── Calendar tab ── */
-  "acc.cal.timezone":                { en: "Timezone",                                                           zh: "时区",                                                               ar: "المنطقة الزمنية" },
-  "acc.cal.timezoneHint":            { en: "All calendar times are shown in this timezone.",                      zh: "所有日历时间均按此时区显示。",                                           ar: "تُعرض جميع أوقات التقويم بهذه المنطقة الزمنية." },
-  "acc.cal.workingHours":            { en: "Working Hours",                                                      zh: "工作时间",                                                           ar: "ساعات العمل" },
-  "acc.cal.start":                   { en: "Start",                                                              zh: "开始",                                                               ar: "البداية" },
-  "acc.cal.end":                     { en: "End",                                                                zh: "结束",                                                               ar: "النهاية" },
-  "acc.cal.activeDays":              { en: "Active Days",                                                        zh: "工作日",                                                             ar: "أيام العمل" },
-  "acc.cal.defaultMeeting":          { en: "Default Meeting Duration",                                           zh: "默认会议时长",                                                        ar: "مدة الاجتماع الافتراضية" },
-  "acc.cal.meetingHint":             { en: "When you create a new meeting, this is the pre-filled duration.",     zh: "创建新会议时，这是预填的时长。",                                         ar: "عند إنشاء اجتماع جديد، هذه هي المدة المعبأة مسبقًا." },
-  "acc.cal.15min":                   { en: "15 minutes",                                                         zh: "15 分钟",                                                             ar: "15 دقيقة" },
-  "acc.cal.30min":                   { en: "30 minutes",                                                         zh: "30 分钟",                                                             ar: "30 دقيقة" },
-  "acc.cal.45min":                   { en: "45 minutes",                                                         zh: "45 分钟",                                                             ar: "45 دقيقة" },
-  "acc.cal.1hr":                     { en: "1 hour",                                                             zh: "1 小时",                                                              ar: "ساعة واحدة" },
-  "acc.cal.1_5hr":                   { en: "1.5 hours",                                                          zh: "1.5 小时",                                                            ar: "ساعة ونصف" },
-  "acc.cal.2hr":                     { en: "2 hours",                                                            zh: "2 小时",                                                              ar: "ساعتان" },
-  "acc.cal.outOfOffice":             { en: "Out of Office",                                                      zh: "不在办公室",                                                          ar: "خارج المكتب" },
-  "acc.cal.oooToggle":               { en: "I'm out of office",                                                  zh: "我不在办公室",                                                        ar: "أنا خارج المكتب" },
-  "acc.cal.oooDescription":          { en: "Shows as unavailable on the calendar during this period.",            zh: "在此期间日历上显示为不可用。",                                           ar: "يظهر كغير متاح في التقويم خلال هذه الفترة." },
-  "acc.cal.startDate":               { en: "Start Date",                                                         zh: "开始日期",                                                           ar: "تاريخ البدء" },
-  "acc.cal.endDate":                 { en: "End Date",                                                           zh: "结束日期",                                                           ar: "تاريخ الانتهاء" },
-  "acc.cal.autoReply":               { en: "Auto-reply Message",                                                 zh: "自动回复消息",                                                        ar: "رسالة الرد التلقائي" },
-  "acc.cal.autoReplyPlaceholder":    { en: "I'm away from the office until [date] and will respond when I'm back.", zh: "我不在办公室，将于 [日期] 回来后回复。", ar: "أنا بعيد عن المكتب حتى [التاريخ] وسأرد عند عودتي." },
 
   /* ── Private tab ── */
   "acc.private.title":               { en: "Private & Confidential",                                             zh: "私人和机密",                                                          ar: "خاص وسري" },
@@ -382,6 +358,28 @@ export const accountsT: Translations = {
   "acc.private.visaExpiry":          { en: "Visa Expiry Date",                                                   zh: "签证到期日",                                                          ar: "تاريخ انتهاء التأشيرة" },
 
   /* ── Security tab — Password & Sign-in ── */
+  /* ── Security tab: password reset, 2FA events, shared actions ──
+     These 15 keys rendered as RAW KEY NAMES in the UI ("acc.security.
+     changePassword" instead of "Change password"). The call sites use
+     `t("key") || "Fallback"`, which can never fire: t() returns the KEY
+     when it is missing, and a non-empty string is truthy. Owner saw the
+     raw keys on the Accounts security tab. */
+  "acc.security.changePassword":     { en: "Change password",                                                    zh: "更改密码",                                                            ar: "تغيير كلمة المرور" },
+  "acc.security.newPasswordPlaceholder": { en: "New password",                                                   zh: "新密码",                                                             ar: "كلمة المرور الجديدة" },
+  "acc.security.generate":           { en: "Generate",                                                           zh: "生成",                                                               ar: "إنشاء" },
+  "acc.security.savePassword":       { en: "Save password",                                                      zh: "保存密码",                                                            ar: "حفظ كلمة المرور" },
+  "acc.security.forceResetOnNextLogin": { en: "Require a new password at next sign-in",                          zh: "下次登录时要求设置新密码",                                              ar: "\u200Fطلب كلمة مرور جديدة عند تسجيل الدخول التالي" },
+  "acc.security.generatedTitle":     { en: "New password generated",                                             zh: "已生成新密码",                                                        ar: "تم إنشاء كلمة مرور جديدة" },
+  "acc.security.generatedNote":      { en: "Copy it now \u2014 it will not be shown again.",                      zh: "请立即复制，之后将不再显示。",                                           ar: "\u200Fانسخها الآن \u2014 لن تظهر مرة أخرى." },
+  "acc.err.passwordTooShort":        { en: "Password is too short",                                              zh: "密码太短",                                                            ar: "كلمة المرور قصيرة جدًا" },
+  "acc.msg.passwordChanged":         { en: "Password changed",                                                   zh: "密码已更改",                                                          ar: "تم تغيير كلمة المرور" },
+  "acc.event.twoFactorEnabled":      { en: "Two-factor enabled",                                                 zh: "已启用双重验证",                                                       ar: "تم تفعيل التحقق بخطوتين" },
+  "acc.event.twoFactorDisabled":     { en: "Two-factor disabled",                                                zh: "已停用双重验证",                                                       ar: "تم إيقاف التحقق بخطوتين" },
+  "common.cancel":                   { en: "Cancel",                                                             zh: "取消",                                                               ar: "إلغاء" },
+  "common.copy":                     { en: "Copy",                                                               zh: "复制",                                                               ar: "نسخ" },
+  "common.copied":                   { en: "Copied",                                                             zh: "已复制",                                                             ar: "تم النسخ" },
+  "common.done":                     { en: "Done",                                                               zh: "完成",                                                               ar: "تم" },
+
   "acc.security.passwordSignIn":     { en: "Password & Sign-in",                                                 zh: "密码和登录",                                                          ar: "كلمة المرور وتسجيل الدخول" },
   "acc.security.password":           { en: "Password",                                                           zh: "密码",                                                               ar: "كلمة المرور" },
   "acc.security.pwSet":              { en: "Set (temporary)",                                                    zh: "已设置（临时）",                                                       ar: "تم التعيين (مؤقت)" },
@@ -535,7 +533,7 @@ export const accountsT: Translations = {
   "acc.mod.Translator":            { en: "Translator",                  zh: "翻译",              ar: "المترجم" },
   "acc.mod.Database":              { en: "Database",                    zh: "数据库",             ar: "قاعدة البيانات" },
   "acc.mod.Commercial Policy":     { en: "Commercial Policy",           zh: "商务政策",           ar: "السياسة التجارية" },
-  "acc.mod.Mail":                  { en: "Mail",                        zh: "邮件",              ar: "البريد" },
+  "acc.mod.Mail":                  { en: "Notifications",               zh: "通知",              ar: "الإشعارات" },
   "acc.mod.Products":              { en: "Products",                    zh: "产品",              ar: "المنتجات" },
   "acc.mod.Products > Categories": { en: "Product categories & subcategories", zh: "产品分类与子分类", ar: "فئات المنتجات والفئات الفرعية" },
   "acc.mod.Products > Brands":     { en: "Brand management",            zh: "品牌管理",           ar: "إدارة العلامات التجارية" },

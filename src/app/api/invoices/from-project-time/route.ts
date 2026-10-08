@@ -8,6 +8,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
+import { inChunks } from "@/lib/server/in-chunks";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
@@ -54,13 +56,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: entries } = await supabaseServer
+  /* EVERY unbilled entry: a plain read stops at the API's 1000 rows, and
+     an entry left out would go unbilled. */
+  const { data: entries } = await allRows(supabaseServer
     .from("project_time_entries")
     .select("id, task_id, minutes, entry_date")
     .eq("tenant_id", auth.tenant_id)
     .eq("project_id", project_id)
     .is("invoiced_invoice_id", null)
-    .limit(2000);
+    .order("id"), "unbilled time");
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "No unbilled time entries on this project." }, { status: 400 });
   }
@@ -76,10 +80,10 @@ export async function POST(req: Request) {
   const taskIds = [...byTask.keys()].filter((k) => k !== "__general__");
   const titles = new Map<string, string>();
   if (taskIds.length) {
-    const { data: tasks } = await supabaseServer
+    const { data: tasks } = await inChunks<{ id: string; title: string }>(taskIds, (chunk) => supabaseServer
       .from("project_tasks")
       .select("id, title")
-      .in("id", taskIds);
+      .in("id", chunk));
     for (const t of tasks ?? []) titles.set(t.id as string, t.title as string);
   }
 
@@ -135,11 +139,16 @@ export async function POST(req: Request) {
       .insert(hydrated.map((h) => ({ ...h, invoice_id: invoice.id })));
   }
 
-  // Stamp the billed entries so they never invoice twice.
-  await supabaseServer
-    .from("project_time_entries")
-    .update({ invoiced_invoice_id: invoice.id })
-    .in("id", entries.map((e) => e.id as string));
+  // Stamp the billed entries so they never invoice twice — in chunks: a few
+  // hundred ids in one URL fail before they reach the database.
+  const entryIds = entries.map((e) => e.id as string);
+  for (let i = 0; i < entryIds.length; i += 150) {
+    const { error: stampErr } = await supabaseServer
+      .from("project_time_entries")
+      .update({ invoiced_invoice_id: invoice.id })
+      .in("id", entryIds.slice(i, i + 150));
+    if (stampErr) console.error(`[invoices/from-project-time] stamping entries ${i}–${i + 149} of invoice ${invoice.id} failed: ${stampErr.message}`);
+  }
 
   const hours = Math.round((entries.reduce((s, e) => s + (Number(e.minutes) || 0), 0) / 60) * 100) / 100;
   return NextResponse.json({ invoice, hours, entries: entries.length });

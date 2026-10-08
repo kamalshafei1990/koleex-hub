@@ -19,6 +19,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import {
   type AnalyticsWindow,
   type ComputeAttempt,
@@ -69,12 +70,12 @@ export async function fetchAttempts(
   window: AnalyticsWindow,
   nowMs: number = Date.now(),
 ): Promise<FetchResult> {
-  const { data, error } = await supabaseServer
+  const { data, error } = await allRows(supabaseServer
     .from("login_attempts")
     .select("id, ip_address, identifier, account_id, outcome, metadata, created_at")
     .gte("created_at", sinceIso(window, nowMs))
     .order("created_at", { ascending: false })
-    .limit(MAX_ROWS);
+    .order("id"), "login attempts", MAX_ROWS);
 
   if (error || !data) return { rows: [], truncated: false };
 

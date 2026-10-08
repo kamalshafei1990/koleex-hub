@@ -24,6 +24,9 @@ import {
 import { useDraftAutosave } from "@/lib/hooks/useDraftAutosave";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { CREATE_EXPENSE } from "@/lib/translations/create";
+import { useToast } from "@/components/kds/useToast";
 
 interface SmartDefaults {
   base_currency: string;
@@ -35,15 +38,16 @@ interface SmartDefaults {
   default_supplier_country: string | null;
 }
 
-const WORKFLOW = [
-  { key: "supplier", label: "Supplier",  icon: "id-badge" as const,        state: "done" as const,    hint: "Pick or add a party" },
-  { key: "expense",  label: "Expense",   icon: "receipt" as const,         state: "current" as const, hint: "You are here" },
-  { key: "approve",  label: "Approve",   icon: "badge-check" as const,     state: "next" as const,    hint: "Manager review" },
-  { key: "pay",      label: "Pay",       icon: "money" as const,           state: "next" as const,    hint: "Settle in bank" },
-];
-
 export default function CreateExpense() {
   const router = useRouter();
+  const { t } = useTranslation(CREATE_EXPENSE);
+  const { showToast, toastElement } = useToast();
+  const WORKFLOW = [
+    { key: "supplier", label: t("create.expense.wf.supplier", "Supplier"), icon: "id-badge" as const,    state: "done" as const,    hint: t("create.expense.wf.supplierHint", "Pick or add a party") },
+    { key: "expense",  label: t("create.expense.wf.expense", "Expense"),   icon: "receipt" as const,     state: "current" as const, hint: t("create.expense.wf.here", "You are here") },
+    { key: "approve",  label: t("create.expense.wf.approve", "Approve"),   icon: "badge-check" as const, state: "next" as const,    hint: t("create.expense.wf.approveHint", "Manager review") },
+    { key: "pay",      label: t("create.expense.wf.pay", "Pay"),           icon: "money" as const,       state: "next" as const,    hint: t("create.expense.wf.payHint", "Settle in bank") },
+  ];
   const [defaults, setDefaults] = useState<SmartDefaults | null>(null);
   const [categories, setCategories] = useState<PickerOption[]>([]);
   const [suppliers, setSuppliers]   = useState<PickerOption[]>([]);
@@ -140,7 +144,7 @@ export default function CreateExpense() {
       setCatModalOpen(false);
       setNewCatName("");
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e));
+      showToast(e instanceof Error ? e.message : String(e), "error");
     } finally { setCreating(false); }
   }
 
@@ -170,13 +174,13 @@ export default function CreateExpense() {
       setSupModalOpen(false);
       setNewSupName(""); setNewSupEmail("");
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e));
+      showToast(e instanceof Error ? e.message : String(e), "error");
     } finally { setCreating(false); }
   }
 
   async function save() {
-    if (!title.trim()) { setError("Title is required."); return; }
-    if (!amount || Number(amount) <= 0) { setError("Amount must be > 0."); return; }
+    if (!title.trim()) { setError(t("create.expense.err.title", "Title is required.")); return; }
+    if (!amount || Number(amount) <= 0) { setError(t("create.expense.err.amount", "Amount must be greater than zero.")); return; }
     setError(null);
     setBusy(true);
     try {
@@ -208,32 +212,33 @@ export default function CreateExpense() {
 
   return (
     <SmartCreatePage
-      title="New Expense"
-      kind="Finance · Operating cost"
-      intro="Record a cost. Submit it for approval, then settle in bank when paid."
+      title={t("create.expense.title", "New Expense")}
+      kind={t("create.expense.kind", "Finance · Operating cost")}
+      intro={t("create.expense.intro", "Record a cost. Submit it for approval, then settle in bank when paid.")}
       icon="receipt"
       backHref="/create"
       workflow={WORKFLOW}
-      primaryAction={{ label: "Save Expense", onClick: save, busy }}
-      secondaryAction={{ label: "Cancel", onClick: () => router.push("/create") }}
+      primaryAction={{ label: t("create.expense.save", "Save Expense"), onClick: save, busy }}
+      secondaryAction={{ label: t("create.expense.cancel", "Cancel"), onClick: () => router.push("/create") }}
       side={
         <SmartHelpCard
-          title="What is this?"
-          meaning="An operating cost incurred by the business. Could be a cash outflow today or a liability you'll pay later (Net 30 etc)."
-          required={["Title", "Amount", "Currency", "Date"]}
-          accountingImpact="When approved + posted, expense lands on the P&L; if unpaid, AP balance grows."
-          nextStep="Submit for approval, then attach a payment when settled."
+          title={t("create.expense.help.title", "What is this?")}
+          meaning={t("create.expense.help.meaning", "An operating cost incurred by the business. Could be a cash outflow today or a liability you'll pay later (Net 30 etc).")}
+          required={[t("create.expense.help.req.title", "Title"), t("create.expense.help.req.amount", "Amount"), t("create.expense.help.req.currency", "Currency"), t("create.expense.help.req.date", "Date")]}
+          accountingImpact={t("create.expense.help.impact", "When approved + posted, expense lands on the P&L; if unpaid, AP balance grows.")}
+          nextStep={t("create.expense.help.next", "Submit for approval, then attach a payment when settled.")}
         />
       }
     >
-      {loading && <div className="text-sm text-gray-500">Loading defaults…</div>}
+      {toastElement}
+      {loading && <div className="text-sm text-[var(--text-dim)]">{t("create.expense.loading", "Loading defaults…")}</div>}
       {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
 
       {/* Resume Draft prompt — surfaced when a previous unsaved attempt
           exists in localStorage. One click to restore, one to discard. */}
       {resumePromptOpen && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[12px] text-amber-100">
-          <span>You have an unsaved draft from a previous session. Resume?</span>
+          <span>{t("create.expense.draft.resume", "You have an unsaved draft from a previous session. Resume?")}</span>
           <div className="flex gap-2">
             <button
               type="button"
@@ -249,13 +254,13 @@ export default function CreateExpense() {
                 setResumePromptOpen(false);
               }}
               className="rounded-md border border-emerald-300/40 bg-emerald-300/[0.10] px-2.5 py-1 text-[11px] text-emerald-100 hover:bg-emerald-300/[0.18]">
-              Resume
+              {t("create.expense.draft.yes", "Resume")}
             </button>
             <button
               type="button"
               onClick={() => { draft.clear(); setResumePromptOpen(false); }}
               className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2.5 py-1 text-[11px] hover:bg-white/[0.08]">
-              Discard
+              {t("create.expense.draft.no", "Discard")}
             </button>
           </div>
         </div>
@@ -263,80 +268,80 @@ export default function CreateExpense() {
 
       {!loading && (
         <>
-          <SmartSection title="Identification" subtitle="What is the expense about?">
-            <SmartField label="Title" required hint='Short, scannable. E.g. "Office rent — May 2026".'>
-              <SmartInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Office rent — May 2026" />
+          <SmartSection title={t("create.expense.sec.id", "Identification")} subtitle={t("create.expense.sec.idSub", "What is the expense about?")}>
+            <SmartField label={t("create.expense.f.title", "Title")} required hint={t("create.expense.f.titleHint", 'Short, scannable. E.g. "Office rent — May 2026".')}>
+              <SmartInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("create.expense.f.titlePh", "Office rent — May 2026")} />
             </SmartField>
 
             {categories.length === 0 ? (
               <SmartEmptyState
                 icon="flag-alt"
-                title="No expense categories yet"
-                body="Categories make reports useful. Add at least one to keep your books organised."
-                actionLabel="Add Expense Category"
+                title={t("create.expense.cat.emptyTitle", "No expense categories yet")}
+                body={t("create.expense.cat.emptyBody", "Categories make reports useful. Add at least one to keep your books organised.")}
+                actionLabel={t("create.expense.cat.add", "Add Expense Category")}
                 onAction={() => setCatModalOpen(true)}
               />
             ) : (
               <InlineEntityPicker
-                label="Category"
+                label={t("create.expense.f.category", "Category")}
                 value={categoryId}
                 onChange={setCategoryId}
                 options={categories}
                 onCreate={createCategory}
-                createLabel="+ New category"
-                placeholder="Choose category…"
-                hint={defaults?.default_expense_category_label ? `Default: ${defaults.default_expense_category_label}` : undefined}
+                createLabel={t("create.expense.f.categoryNew", "+ New category")}
+                placeholder={t("create.expense.f.categoryPh", "Choose category…")}
+                hint={defaults?.default_expense_category_label ? t("create.expense.f.categoryDefault", "Default: {name}").replace("{name}", defaults.default_expense_category_label) : undefined}
               />
             )}
             <InlineEntityPicker
-              label="Supplier"
+              label={t("create.expense.f.supplier", "Supplier")}
               value={supplierId}
               onChange={setSupplierId}
               options={suppliers}
               onCreate={createSupplier}
-              createLabel="+ New supplier"
-              placeholder="Choose supplier (optional)…"
-              hint="Linking a supplier feeds AP and supplier ledger reports."
+              createLabel={t("create.expense.f.supplierNew", "+ New supplier")}
+              placeholder={t("create.expense.f.supplierPh", "Choose supplier (optional)…")}
+              hint={t("create.expense.f.supplierHint", "Linking a supplier feeds AP and supplier ledger reports.")}
             />
           </SmartSection>
 
-          <SmartSection title="Amount" subtitle="Money side of the entry">
+          <SmartSection title={t("create.expense.sec.amount", "Amount")} subtitle={t("create.expense.sec.amountSub", "Money side of the entry")}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SmartField label="Amount" required impact={["accounting"]}>
+              <SmartField label={t("create.expense.f.amount", "Amount")} required impact={["accounting"]}>
                 <SmartInput type="number" step="0.01" value={amount}
                             onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
               </SmartField>
-              <SmartField label="Currency" required impact={["accounting"]}
-                          hint={defaults ? `Tenant base: ${defaults.base_currency}` : undefined}>
+              <SmartField label={t("create.expense.f.currency", "Currency")} required impact={["accounting"]}
+                          hint={defaults ? t("create.expense.f.currencyHint", "Tenant base: {ccy}").replace("{ccy}", defaults.base_currency) : undefined}>
                 <SmartSelect value={currency} onChange={(e) => { setCurrency(e.target.value); setCurrencyTouched(true); }}>
                   {["CNY", "USD", "EUR", "GBP", "AED", "SAR", "EGP"].map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </SmartSelect>
               </SmartField>
-              <SmartField label="Payment status" hint="Mark Paid only if money has already left.">
+              <SmartField label={t("create.expense.f.payStatus", "Payment status")} hint={t("create.expense.f.payStatusHint", "Mark Paid only if money has already left.")}>
                 <SmartSelect value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as "unpaid" | "paid")}>
-                  <option value="unpaid">Unpaid (owed)</option>
-                  <option value="paid">Paid</option>
+                  <option value="unpaid">{t("create.expense.f.unpaid", "Unpaid (owed)")}</option>
+                  <option value="paid">{t("create.expense.f.paid", "Paid")}</option>
                 </SmartSelect>
               </SmartField>
             </div>
           </SmartSection>
 
-          <SmartSection title="Dates" subtitle="When did this happen?">
+          <SmartSection title={t("create.expense.sec.dates", "Dates")} subtitle={t("create.expense.sec.datesSub", "When did this happen?")}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <SmartField label="Expense date" required>
+              <SmartField label={t("create.expense.f.date", "Expense date")} required>
                 <SmartInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </SmartField>
-              <SmartField label="Due date" hint={`Defaults to ${defaults?.default_payment_terms ?? "Net 30"} if you leave blank.`}>
+              <SmartField label={t("create.expense.f.due", "Due date")} hint={t("create.expense.f.dueHint", "Defaults to {terms} if you leave blank.").replace("{terms}", defaults?.default_payment_terms ?? "Net 30")}>
                 <SmartInput type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </SmartField>
             </div>
           </SmartSection>
 
-          <SmartSection title="Notes" subtitle="Anything useful for an approver">
-            <SmartField label="Notes" hint="Optional. Shown on the activity log.">
-              <SmartTextarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Receipt #4521 — for landlord." />
+          <SmartSection title={t("create.expense.sec.notes", "Notes")} subtitle={t("create.expense.sec.notesSub", "Anything useful for an approver")}>
+            <SmartField label={t("create.expense.f.notes", "Notes")} hint={t("create.expense.f.notesHint", "Optional. Shown on the activity log.")}>
+              <SmartTextarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("create.expense.f.notesPh", "Receipt #4521 — for landlord.")} />
             </SmartField>
           </SmartSection>
         </>
@@ -345,29 +350,29 @@ export default function CreateExpense() {
       {/* Inline-create modals */}
       <InlineCreateModal
         open={catModalOpen}
-        title="New Expense Category"
-        intro="Categories drive P&L grouping and reports."
+        title={t("create.expense.modal.catTitle", "New Expense Category")}
+        intro={t("create.expense.modal.catIntro", "Categories drive P&L grouping and reports.")}
         onClose={() => setCatModalOpen(false)}
         busy={creating}
         onSubmit={submitCategory}
       >
-        <SmartField label="Category name" required>
-          <SmartInput autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Office rent" />
+        <SmartField label={t("create.expense.modal.catName", "Category name")} required>
+          <SmartInput autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("create.expense.modal.catPh", "Office rent")} />
         </SmartField>
       </InlineCreateModal>
 
       <InlineCreateModal
         open={supModalOpen}
-        title="New Supplier"
-        intro="Used for bills, payments, and AP reports."
+        title={t("create.expense.modal.supTitle", "New Supplier")}
+        intro={t("create.expense.modal.supIntro", "Used for bills, payments, and AP reports.")}
         onClose={() => setSupModalOpen(false)}
         busy={creating}
         onSubmit={submitSupplier}
       >
-        <SmartField label="Company name" required>
-          <SmartInput autoFocus value={newSupName} onChange={(e) => setNewSupName(e.target.value)} placeholder="Acme Logistics" />
+        <SmartField label={t("create.expense.modal.supName", "Company name")} required>
+          <SmartInput autoFocus value={newSupName} onChange={(e) => setNewSupName(e.target.value)} placeholder={t("create.expense.modal.supPh", "Acme Logistics")} />
         </SmartField>
-        <SmartField label="Email" hint="Optional. We won't email anyone without your action.">
+        <SmartField label={t("create.expense.modal.email", "Email")} hint={t("create.expense.modal.emailHint", "Optional. We won't email anyone without your action.")}>
           <SmartInput type="email" value={newSupEmail} onChange={(e) => setNewSupEmail(e.target.value)} placeholder="ops@acme.com" />
         </SmartField>
       </InlineCreateModal>

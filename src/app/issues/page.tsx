@@ -25,7 +25,7 @@ export default function IssuesPage() {
   const { t } = useTranslation(T);
   return (
     <PermissionGate module="Issue Reports">
-      <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
+      <div className="min-h-full bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
         <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
           <PageHeader
             title={t("issues.title", "Issue Reports")}

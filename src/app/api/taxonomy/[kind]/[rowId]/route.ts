@@ -8,6 +8,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
 import { invalidateTaxonomyAll } from "@/lib/server/taxonomy-cache";
@@ -47,6 +48,8 @@ export async function PATCH(
   /* Drop the ?kind=all memo so the editor doesn't read back their own row
      unchanged for the next minute. */
   invalidateTaxonomyAll();
+  /* Division / category names show on the website and its product pages. */
+  revalidateWebsite(["taxonomy", "products"]);
   return NextResponse.json({ ok: true });
 }
 
@@ -62,5 +65,7 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   invalidateTaxonomyAll();
+  /* Division / category names show on the website and its product pages. */
+  revalidateWebsite(["taxonomy", "products"]);
   return NextResponse.json({ ok: true });
 }

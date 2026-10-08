@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_REPORTS } from "@/lib/translations/finance/reports";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import type {
@@ -39,7 +39,7 @@ export default function FinanceReports({
   initialFilters?: ReportFilters;
 }) {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_REPORTS);
   const [templates, setTemplates] = useState<ReportTemplateDescriptor[]>([]);
   const [activeType, setActiveType] = useState<ReportType | null>(initialType ?? null);
   const [filters, setFilters] = useState<ReportFilters>(initialFilters ?? defaultFilters());
@@ -53,6 +53,10 @@ export default function FinanceReports({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"pdf" | "print" | null>(null);
+  /* A report this role may not open (src/lib/experience, reportRefusal):
+     the templates say so up front (`locked`); a 403 says the same for a
+     report opened by link before the list arrived. */
+  const [serverLocked, setServerLocked] = useState<string | null>(null);
 
   /* Initial: load templates + party catalogues. */
   useEffect(() => {
@@ -79,6 +83,11 @@ export default function FinanceReports({
     () => templates.find((t) => t.type === activeType) ?? null,
     [templates, activeType],
   );
+  const activeLocked = activeDescriptor?.locked ?? null;
+  const lockedCode = activeLocked ?? serverLocked;
+  const lockedLabel = (code: string) => code === "needs_bank_profit"
+    ? t("reports.locked.bankProfit", "This report opens with «Bank & Profit» in Roles & Permissions.")
+    : t("reports.locked.cost", "This report opens with «Can see private data» in Roles & Permissions.");
 
   /* Phase S.4 — memoize the filters JSON key once so the effect deps
      are stable and JSON.stringify isn't called on every render. */
@@ -87,13 +96,13 @@ export default function FinanceReports({
   /* Live preview whenever the type / filters change. Debounced 300ms
      so we don't flood the API on every keystroke. */
   useEffect(() => {
-    if (!activeType) return;
+    if (!activeType || activeLocked) return;
     const handle = window.setTimeout(() => {
       void loadPreview(activeType, filters);
     }, 300);
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeType, filtersKey]);
+  }, [activeType, filtersKey, activeLocked]);
 
   const loadPreview = useCallback(async (type: ReportType, f: ReportFilters) => {
     setPreviewLoading(true);
@@ -108,10 +117,12 @@ export default function FinanceReports({
       if (!res.ok) {
         const j = await res.json().catch(() => ({ error: `Preview failed (${res.status})` }));
         setPreviewHtml(null);
+        if (j.code === "needs_bank_profit" || j.code === "needs_private_data") { setServerLocked(j.code); return; }
         setPreviewError(j.error ?? `Preview failed (${res.status})`);
         return;
       }
       const html = await res.text();
+      setServerLocked(null);
       setPreviewHtml(html);
     } catch (e) {
       setPreviewError(e instanceof Error ? e.message : String(e));
@@ -132,6 +143,7 @@ export default function FinanceReports({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({ error: `PDF failed (${res.status})` }));
+        if (j.code === "needs_bank_profit" || j.code === "needs_private_data") { setServerLocked(j.code); return; }
         showToast(j.error ?? `PDF failed (${res.status})`, "error");
         return;
       }
@@ -163,6 +175,7 @@ export default function FinanceReports({
       });
       const j = await res.json();
       if (!res.ok) {
+        if (j.code === "needs_bank_profit" || j.code === "needs_private_data") { setServerLocked(j.code); return; }
         showToast(j.error ?? `Print failed (${res.status})`, "error");
         return;
       }
@@ -181,7 +194,7 @@ export default function FinanceReports({
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("reports.centre.title", "Reporting Centre")}
           subtitle={t("reports.centre.subtitle", "Generate, print, and export official finance documents. External reports are safe to send; internal ones never leave the company.")}
@@ -191,8 +204,8 @@ export default function FinanceReports({
           {/* ───────── Type picker ───────── */}
           <SectionCard>
             <div className="space-y-4">
-              <PickerSection title={t("reports.section.external", "External · safe to send")} templates={externalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); }} accent="emerald" />
-              <PickerSection title={t("reports.section.internal", "Internal · operators only")} templates={internalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); }} accent="rose" />
+              <PickerSection title={t("reports.section.external", "External · safe to send")} templates={externalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); setServerLocked(null); }} accent="emerald" lockedLabel={lockedLabel} />
+              <PickerSection title={t("reports.section.internal", "Internal · operators only")} templates={internalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); setServerLocked(null); }} accent="rose" lockedLabel={lockedLabel} />
             </div>
           </SectionCard>
 
@@ -209,6 +222,7 @@ export default function FinanceReports({
                 onDownload={downloadPdf}
                 onPrint={openPrint}
                 busy={busy}
+                locked={lockedCode !== null}
               />
             ) : (
               <div className="py-12 text-center text-sm text-[var(--text-dim)]">{t("reports.pickPrompt", "Pick a report type to begin.")}</div>
@@ -225,7 +239,9 @@ export default function FinanceReports({
               <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{t("reports.preview.title", "Document preview")}</div>
               {previewLoading && <span className="text-[10px] text-[var(--text-dim)]">{t("reports.preview.updating", "Updating…")}</span>}
             </div>
-            {previewError ? (
+            {lockedCode ? (
+              <div className="rounded-lg border border-[var(--border-subtle)] px-3 py-3 text-[12px] text-[var(--text-dim)]">{lockedLabel(lockedCode)}</div>
+            ) : previewError ? (
               <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{previewError}</div>
             ) : previewHtml ? (
               <div className="overflow-hidden rounded-md border border-[var(--border-faint)] bg-white" style={{ aspectRatio: "210 / 297" }}>
@@ -260,13 +276,14 @@ function defaultFilters(): ReportFilters {
 }
 
 function PickerSection({
-  title, templates, active, onPick, accent,
+  title, templates, active, onPick, accent, lockedLabel,
 }: {
   title: string;
   templates: ReportTemplateDescriptor[];
   active: ReportType | null;
   onPick: (t: ReportType) => void;
   accent: "emerald" | "rose";
+  lockedLabel: (code: string) => string;
 }) {
   const dotColor = accent === "emerald" ? "bg-emerald-500" : "bg-rose-500";
   return (
@@ -283,7 +300,8 @@ function PickerSection({
               key={t.type}
               type="button"
               onClick={() => onPick(t.type)}
-              className={`w-full rounded-lg border px-3 py-2 text-left text-[12px] transition ${
+              disabled={!!t.locked}
+              className={`w-full rounded-lg border px-3 py-2 text-left text-[12px] transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 isActive
                   ? "border-white/15 bg-[var(--bg-surface-hover)]"
                   : "border-[var(--border-faint)] bg-[var(--bg-primary)] hover:border-[var(--border-color)]"
@@ -293,7 +311,7 @@ function PickerSection({
                 <RrIcon name={t.icon as RrIconName} size={14} />
                 <span className="font-semibold">{t.title}</span>
               </div>
-              <div className="mt-1 text-[10px] text-[var(--text-dim)]">{t.description}</div>
+              <div className="mt-1 text-[10px] text-[var(--text-dim)]">{t.locked ? lockedLabel(t.locked) : t.description}</div>
             </button>
           );
         })}
@@ -303,7 +321,7 @@ function PickerSection({
 }
 
 function FiltersPanel({
-  descriptor, filters, onChange, customers, suppliers, bankAccounts, onDownload, onPrint, busy,
+  descriptor, filters, onChange, customers, suppliers, bankAccounts, onDownload, onPrint, busy, locked,
 }: {
   descriptor: ReportTemplateDescriptor;
   filters: ReportFilters;
@@ -314,8 +332,10 @@ function FiltersPanel({
   onDownload: () => void;
   onPrint: () => void;
   busy: "pdf" | "print" | null;
+  /** The report is closed to this role — nothing to print or download. */
+  locked: boolean;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_REPORTS);
   const allFilterKeys: Array<keyof ReportFilters> = Array.from(new Set([...descriptor.required_filters, ...descriptor.optional_filters]));
   const set = (k: keyof ReportFilters, v: string | undefined) => onChange({ ...filters, [k]: v || undefined });
 
@@ -359,7 +379,7 @@ function FiltersPanel({
         <button
           type="button"
           onClick={onPrint}
-          disabled={busy !== null}
+          disabled={busy !== null || locked}
           className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50"
         >
           {busy === "print" ? t("reports.btn.printing", "Preparing…") : t("reports.btn.print", "Print")}
@@ -367,7 +387,7 @@ function FiltersPanel({
         <button
           type="button"
           onClick={onDownload}
-          disabled={busy !== null}
+          disabled={busy !== null || locked}
           className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-600 dark:text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
         >
           {busy === "pdf" ? t("reports.btn.building", "Building…") : t("reports.btn.download", "Download PDF")}

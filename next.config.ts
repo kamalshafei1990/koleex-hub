@@ -28,6 +28,20 @@ const SUPABASE_HOST = (() => {
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /* AI-generated files (images, PDFs) download from OUR domain. The media
+     bucket is public-by-design — the random UUID path is the token — and
+     this rewrite proxies the exact same bytes, so access semantics are
+     unchanged while the chat link reads hub.koleexgroup.com instead of a
+     storage host the user has never heard of. Scoped to the ai-generated
+     prefix only; no other bucket path is proxied. */
+  async rewrites() {
+    return [
+      {
+        source: "/ai/files/:path*",
+        destination: `https://${SUPABASE_HOST}/storage/v1/object/public/media/ai-generated/:path*`,
+      },
+    ];
+  },
   /* China remediation R3 (stage 1): first-party image delivery. The browser
      requests /_next/image on OUR origin (proven ~99% reachable from mainland
      China); Vercel fetches the original from Supabase server-side (hnd1 <->
@@ -61,7 +75,17 @@ const nextConfig: NextConfig = {
      OUT of the server bundle so the prebuilt .node binary is require()'d at
      runtime instead of being mangled by the bundler. Server (Node) runtime
      only — never imported into client/edge code. */
-  serverExternalPackages: ["@node-rs/argon2"],
+  serverExternalPackages: [
+    "@node-rs/argon2",
+    /* Native skia binding — bundling it strips the .node binary and every
+       scanned-PDF rasterisation dies with MODULE_NOT_FOUND. Keep external. */
+    "@napi-rs/canvas",
+    /* unpdf bundles its own pdf.js whose canvas factory does a dynamic
+       import of @napi-rs/canvas — bundling unpdf breaks that import and
+       every scan rasterisation throws. Unbundled in real Node, the whole
+       chain works (verified standalone). */
+    "unpdf",
+  ],
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },

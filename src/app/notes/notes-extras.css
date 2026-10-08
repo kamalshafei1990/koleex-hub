@@ -1,0 +1,75 @@
+/* ---------------------------------------------------------------------------
+   Notes — styles for the 2026-09-26 additions (live co-editing carets,
+   note links, checklist → To-do marker, slash/[[ menus' trigger text).
+   Imported by src/app/notes/layout.tsx; every selector is scoped to
+   .notes-editor so nothing leaks into other apps. Logical properties only
+   (RTL-safe); colours are theme tokens or Hub Blue.
+   --------------------------------------------------------------------------- */
+
+/* Collaborator caret (TipTap CollaborationCaret) */
+.notes-editor .collaboration-carets__caret {
+  position: relative;
+  margin-inline: -1px;
+  border-inline-start: 2px solid;
+  border-inline-end: 0;
+  word-break: normal;
+  pointer-events: none;
+}
+.notes-editor .collaboration-carets__label {
+  position: absolute;
+  inset-block-start: -1.35em;
+  inset-inline-start: -2px;
+  padding: 1px 6px;
+  border-radius: 6px 6px 6px 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-style: normal;
+  color: #fff;
+  white-space: nowrap;
+  user-select: none;
+}
+.notes-editor .collaboration-carets__selection {
+  border-radius: 2px;
+}
+
+/* In-app note links ([[ picker) read as chips, distinct from web links */
+.notes-editor a[href^="/notes?id="] {
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 0 4px;
+  background: color-mix(in srgb, #567FB2 14%, transparent);
+  cursor: pointer;
+}
+.notes-editor a[href^="/notes?id="]::before {
+  content: "↗ ";
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+/* Checklist item already turned into a To-do — a language-neutral marker;
+   the item's floating control says "Open to-do" in words. */
+.notes-editor ul[data-type="taskList"] li[data-todo-id] > div::after {
+  content: "\2713";
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  vertical-align: 1px;
+  text-decoration: none;
+  color: #567FB2;
+  background: color-mix(in srgb, #567FB2 14%, transparent);
+}
+:root[data-theme="dark"] .notes-editor ul[data-type="taskList"] li[data-todo-id] > div::after {
+  color: #7FA9D6;
+}
+
+/* Phones: leave room under the text for the sticky formatting bar */
+@media (max-width: 767px) {
+  .notes-mobilebar-open .notes-editor {
+    padding-block-end: 64px;
+  }
+}

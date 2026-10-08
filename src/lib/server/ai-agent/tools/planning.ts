@@ -8,13 +8,59 @@ import "server-only";
    created, open (unassigned) shifts, and items on a resource that belongs
    to them. Super-admins skip the scope (tenant filter still applies).
 
-   Phase 1 is read-only. Rate fields (hourly_rate) are intentionally not
-   selected.
+   Rate fields (hourly_rate) are intentionally not selected.
+
+   Writes run the SAME server conflict check as the app
+   (lib/server/planning-conflicts): a double booking, approved leave or
+   business trip, or Calendar out-of-office time is shown in the preview
+   and blocks the confirmed write, unless a super admin explicitly passes
+   override_conflicts:true. copyLastWeek and
+   publishWeek share lib/server/planning-week with the app's routes, so they
+   only ever touch rows the user may edit.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
+import {
+  callerResourceIds,
+  loadPlanningItemForCaller,
+  planningReadScopeOr,
+} from "../../planning-access";
+import { checkPlanningConflicts, type PlanningConflict } from "../../planning-conflicts";
+import { copyLastWeek as copyLastWeekCore, publishWeek as publishWeekCore } from "../../planning-week";
+import { zonedParts, zonedToUtc } from "@/lib/calendar-tz";
+
+/** One readable line per conflict, for previews and refusals. */
+function describeConflicts(list: PlanningConflict[], total: number): string {
+  const lines = list.slice(0, 5).map((c) =>
+    c.kind === "leave"
+      ? `${c.resource_name ?? "The person"} is on approved leave ${c.leave_start} → ${c.leave_end}`
+      : c.kind === "travel"
+        ? `${c.resource_name ?? "The person"} is on an approved business trip ${c.leave_start} → ${c.leave_end}`
+        : c.kind === "out_of_office"
+          ? `${c.resource_name ?? "The person"} is out of office in their calendar (${c.away_start_at} → ${c.away_end_at})`
+          : `${c.resource_name ?? "That resource"} is already booked for "${c.other_title ?? "another item"}" (${c.other_start_at} → ${c.other_end_at})`,
+  );
+  if (total > lines.length) lines.push(`…and ${total - lines.length} more`);
+  return lines.join("; ");
+}
+
+/** The instant a week starts (Monday 00:00 in `tz`), from "YYYY-MM-DD" or now. */
+function weekStartInstant(arg: unknown, tz: string): string | null {
+  let y: number, m: number, d: number;
+  if (typeof arg === "string" && arg.trim()) {
+    const mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(arg.trim());
+    if (!mt) return null;
+    [y, m, d] = [Number(mt[1]), Number(mt[2]), Number(mt[3])];
+  } else {
+    const p = zonedParts(Date.now(), tz);
+    [y, m, d] = [p.y, p.m, p.d];
+  }
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const back = dow === 0 ? 6 : dow - 1;
+  return new Date(zonedToUtc(y, m, d - back, 0, 0, 0, 0, tz)).toISOString();
+}
 
 const PLANNING_MODULE = "Planning";
 
@@ -55,13 +101,14 @@ const listMyPlanning: ToolDef<
     const limit = Math.min(Math.max(Number(args.limit ?? 30) || 30, 1), 60);
     const { from, to } = windowISO(days);
 
-    // Resource ids belonging to the caller.
-    const { data: mineRes } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("account_id", accountId);
-    const rids = (mineRes ?? []).map((r) => (r as { id: string }).id);
+    // Resource ids belonging to the caller (shared helper — same rule as the app).
+    let rids: string[];
+    try {
+      rids = await callerResourceIds({ account_id: accountId, tenant_id: tenantId });
+    } catch (e) {
+      console.error("[tool.listMyPlanning] resources", e);
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your planning right now." };
+    }
 
     let q = supabaseServer
       .from("planning_items")
@@ -76,12 +123,7 @@ const listMyPlanning: ToolDef<
       if (rids.length > 0) q = q.in("resource_id", rids);
       else return { ok: true, permissionStatus: "allowed", data: [], message: "You have no assigned resource, so no personal planning items." };
     } else if (!ctx.isSuperAdmin) {
-      const orParts = [
-        `created_by_account_id.eq.${accountId}`,
-        `resource_id.is.null`,
-      ];
-      if (rids.length > 0) orParts.push(`resource_id.in.(${rids.join(",")})`);
-      q = q.or(orParts.join(","));
+      q = q.or(planningReadScopeOr(accountId, rids));
     }
 
     const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
@@ -92,7 +134,7 @@ const listMyPlanning: ToolDef<
     const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
     if (error) {
       console.error("[tool.listMyPlanning]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load your planning right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your planning right now." };
     }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     return {
@@ -113,6 +155,7 @@ const createPlanningItem: ToolDef<
     end_at?: string;
     type?: string;
     notes?: string;
+    override_conflicts?: boolean;
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
@@ -128,6 +171,7 @@ const createPlanningItem: ToolDef<
       end_at: { type: "string", description: "ISO end datetime (required)." },
       type: { type: "string", description: "shift | meeting | other. Default shift.", enum: ["shift", "meeting", "other"] },
       notes: { type: "string", description: "Optional notes." },
+      override_conflicts: { type: "boolean", description: "Super admins only: save even though the preview reported a schedule conflict — ONLY when the user explicitly said to save anyway." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
     },
     required: ["start_at", "end_at"],
@@ -137,14 +181,17 @@ const createPlanningItem: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const startAt = String(args.start_at ?? "").trim();
     const endAt = String(args.end_at ?? "").trim();
-    if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    if (!startAt || !endAt) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
     {
       const s = Date.parse(startAt), e = Date.parse(endAt);
-      if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) {
-        return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
+      if (Number.isNaN(s) || Number.isNaN(e)) {
+        return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read those times — give me a start and end as full dates with times." };
+      }
+      if (e <= s) {
+        return { ok: false, permissionStatus: "allowed", data: null, message: "The end time must be after the start time." };
       }
     }
-    const title = args.title ? String(args.title) : "";
+    const title = args.title ? String(args.title).slice(0, 200) : "";
     /* planning_items_type_check allows shift|meeting|production|delivery|
        maintenance|project_task|room_booking|other — anything else from the
        model (it used to offer "task"/"time_off") collapses to "shift" so
@@ -156,19 +203,37 @@ const createPlanningItem: ToolDef<
     // Attach to the caller's own resource so it's their planned time (not an
     // open shift). If they have none, it's created unassigned.
     const { data: mineRes } = await supabaseServer
-      .from("planning_resources").select("id").eq("tenant_id", ctx.auth.tenant_id).eq("account_id", ctx.auth.account_id).limit(1);
+      .from("planning_resources").select("id").eq("tenant_id", ctx.auth.tenant_id).eq("account_id", ctx.auth.account_id)
+      .eq("is_active", true).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(1);
     const resourceId = (mineRes ?? [])[0] ? (mineRes as { id: string }[])[0].id : null;
 
     const normalized = { title, start_at: startAt, end_at: endAt, type, notes: args.notes ? String(args.notes) : null };
+
+    let check: { conflicts: PlanningConflict[]; total: number };
+    try {
+      check = await checkPlanningConflicts(
+        ctx.auth.tenant_id,
+        [{ title, resource_id: resourceId, start_at: new Date(Date.parse(startAt)).toISOString(), end_at: new Date(Date.parse(endAt)).toISOString(), status: "draft" }],
+        { tz: ctx.timezone },
+      );
+    } catch (e) {
+      console.error("[tool.createPlanningItem] conflicts", e);
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't check your schedule for conflicts — please try again." };
+    }
+    const override = args.override_conflicts === true && ctx.isSuperAdmin;
+    const conflictNote = check.total > 0 ? ` Conflict: ${describeConflicts(check.conflicts, check.total)}.` : "";
 
     if (args.confirm !== true) {
       return {
         ok: true,
         permissionStatus: "approval_required",
-        data: { preview: { ...normalized, resource_assigned: !!resourceId } },
-        message: `Ready to add to your schedule: ${title || type} from ${startAt} to ${endAt}${resourceId ? "" : " (unassigned — you have no personal resource)"}. Confirm and I'll create it.`,
-        pendingAction: { tool: "createPlanningItem", args: { ...normalized, confirm: true } },
+        data: { preview: { ...normalized, resource_assigned: !!resourceId, conflicts: check.conflicts } },
+        message: `Ready to add to your schedule: ${title || type} from ${startAt} to ${endAt}${resourceId ? "" : " (unassigned — you have no personal resource)"}.${conflictNote}${check.total > 0 && !ctx.isSuperAdmin ? " It can't be saved while it conflicts — pick another time." : " Confirm and I'll create it."}`,
+        pendingAction: { tool: "createPlanningItem", args: { ...normalized, override_conflicts: check.total > 0 && ctx.isSuperAdmin ? true : undefined, confirm: true } },
       };
+    }
+    if (check.total > 0 && !override) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: `Not saved — schedule conflict.${conflictNote}` };
     }
 
     const { data, error } = await supabaseServer
@@ -198,7 +263,7 @@ const createPlanningItem: ToolDef<
 
     if (error) {
       console.error("[tool.createPlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the planning item — please try again." };
     }
     return {
       ok: true,
@@ -211,10 +276,10 @@ const createPlanningItem: ToolDef<
 };
 
 /* ── Shared loader for mutations ──
-   The app's PATCH/DELETE gate on module action + tenant; the agent holds
-   itself to the caller's OWN slice of the schedule: an item is mutable
-   via AI only if the caller created it or it sits on their own resource
-   (SA skips). Open shifts and other people's shifts stay app-only. */
+   The ownership rule now lives in lib/server/planning-access.ts and is the
+   SAME one the app's PATCH/DELETE routes enforce: an item is mutable only
+   if the caller created it or it sits on their own resource (SA skips).
+   Open shifts and other people's shifts are refused. */
 interface PlanningRow {
   id: string;
   type: string | null;
@@ -231,27 +296,13 @@ async function loadOwnPlanningItem(
   ctx: { auth: { account_id: string; tenant_id: string }; isSuperAdmin: boolean },
   id: string,
 ): Promise<PlanningRow | null> {
-  const { data } = await supabaseServer
-    .from("planning_items")
-    .select("id, type, title, notes, resource_id, start_at, end_at, status, created_by_account_id")
-    .eq("id", id)
-    .eq("tenant_id", ctx.auth.tenant_id)
-    .maybeSingle();
-  const item = (data as PlanningRow | null) ?? null;
-  if (!item) return null;
-  if (ctx.isSuperAdmin) return item;
-  if (item.created_by_account_id === ctx.auth.account_id) return item;
-  if (item.resource_id) {
-    const { data: res } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("id", item.resource_id)
-      .eq("tenant_id", ctx.auth.tenant_id)
-      .eq("account_id", ctx.auth.account_id)
-      .maybeSingle();
-    if (res) return item;
-  }
-  return null;
+  const r = await loadPlanningItemForCaller<PlanningRow>(
+    { account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: ctx.isSuperAdmin },
+    id,
+    "write",
+    "id, type, title, notes, resource_id, start_at, end_at, status, created_by_account_id",
+  );
+  return r.ok ? r.item : null;
 }
 
 /* ── Edit / cancel a planning item (with confirm) ──
@@ -268,6 +319,7 @@ const updatePlanningItem: ToolDef<
     start_at?: string;
     end_at?: string;
     status?: string;
+    override_conflicts?: boolean;
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
@@ -284,6 +336,7 @@ const updatePlanningItem: ToolDef<
       start_at: { type: "string", description: "New ISO start datetime." },
       end_at: { type: "string", description: "New ISO end datetime." },
       status: { type: "string", description: "Only \"cancelled\" is allowed — cancels the shift/item.", enum: ["cancelled"] },
+      override_conflicts: { type: "boolean", description: "Super admins only: save even though the preview reported a schedule conflict — ONLY when the user explicitly said to save anyway." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
     },
     required: ["item_id"],
@@ -292,23 +345,28 @@ const updatePlanningItem: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
-    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
+    if (!item) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
 
     const changes: Record<string, unknown> = {};
     if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
     if (typeof args.notes === "string") changes.notes = args.notes;
     if (typeof args.start_at === "string" && args.start_at.trim()) changes.start_at = args.start_at.trim();
     if (typeof args.end_at === "string" && args.end_at.trim()) changes.end_at = args.end_at.trim();
+    for (const k of ["start_at", "end_at"] as const) {
+      if (typeof changes[k] === "string" && Number.isNaN(Date.parse(changes[k] as string))) {
+        return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that time — give it as a full date with a time." };
+      }
+    }
     if (args.status === "cancelled") {
       changes.status = "cancelled";
       changes.cancelled_at = new Date().toISOString();
     }
     if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
     }
 
     /* planning_items CHECK (end_at > start_at): validate the EFFECTIVE
@@ -317,10 +375,34 @@ const updatePlanningItem: ToolDef<
     const effStart = Date.parse((changes.start_at as string | undefined) ?? item.start_at ?? "");
     const effEnd = Date.parse((changes.end_at as string | undefined) ?? item.end_at ?? "");
     if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd <= effStart) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "The end time must be after the start time." };
     }
 
     const label = item.title || item.type || "planning item";
+
+    /* A reschedule runs the conflict check (cancelling never conflicts). */
+    let check: { conflicts: PlanningConflict[]; total: number } = { conflicts: [], total: 0 };
+    if (changes.status !== "cancelled" && ("start_at" in changes || "end_at" in changes) && item.status !== "cancelled") {
+      try {
+        check = await checkPlanningConflicts(
+          ctx.auth.tenant_id,
+          [{
+            id: item.id,
+            title: label,
+            resource_id: item.resource_id,
+            start_at: new Date(effStart).toISOString(),
+            end_at: new Date(effEnd).toISOString(),
+            status: item.status,
+          }],
+          { tz: ctx.timezone },
+        );
+      } catch (e) {
+        console.error("[tool.updatePlanningItem] conflicts", e);
+        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't check the schedule for conflicts — please try again." };
+      }
+    }
+    const conflictNote = check.total > 0 ? ` Conflict: ${describeConflicts(check.conflicts, check.total)}.` : "";
+
     if (args.confirm !== true) {
       const cancelling = changes.status === "cancelled";
       const parts = Object.entries(changes)
@@ -332,9 +414,12 @@ const updatePlanningItem: ToolDef<
         data: { preview: { item_id: item.id, title: label, changes } },
         message: cancelling
           ? `Ready to CANCEL "${label}" (${item.start_at ?? ""}). Confirm?`
-          : `Ready to update "${label}": ${parts.join(", ")}. Confirm?`,
-        pendingAction: { tool: "updatePlanningItem", args: { ...args, item_id: item.id, confirm: true } },
+          : `Ready to update "${label}": ${parts.join(", ")}.${conflictNote}${check.total > 0 && !ctx.isSuperAdmin ? " It can't be saved while it conflicts — pick another time." : " Confirm?"}`,
+        pendingAction: { tool: "updatePlanningItem", args: { ...args, item_id: item.id, override_conflicts: check.total > 0 && ctx.isSuperAdmin ? true : undefined, confirm: true } },
       };
+    }
+    if (check.total > 0 && !(args.override_conflicts === true && ctx.isSuperAdmin)) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: `Not saved — schedule conflict.${conflictNote}` };
     }
 
     const { error } = await supabaseServer
@@ -344,7 +429,7 @@ const updatePlanningItem: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.updatePlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the planning item — please try again." };
     }
     return {
       ok: true,
@@ -376,11 +461,11 @@ const deletePlanningItem: ToolDef<
   requiredAction: "delete",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
-    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };
+    if (!item) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };
 
     const label = item.title || item.type || "planning item";
     const when = item.start_at ? ` (${item.start_at})` : "";
@@ -401,7 +486,7 @@ const deletePlanningItem: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.deletePlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the planning item — please try again." };
     }
     return {
       ok: true,
@@ -413,9 +498,92 @@ const deletePlanningItem: ToolDef<
   },
 };
 
+/* ── Week actions: copy last week / publish week (with confirm) ── */
+type WeekArgs = { week_start?: string; confirm?: boolean };
+const weekParams = {
+  type: "object",
+  properties: {
+    week_start: { type: "string", description: "Any date (YYYY-MM-DD) inside the target week; the week runs Monday → Sunday in the user's timezone. Default: the current week." },
+    confirm: { type: "boolean", description: "Leave unset to PREVIEW the count. Set true ONLY after the user explicitly agreed." },
+  },
+  required: [],
+} as const;
+
+const copyLastWeek: ToolDef<WeekArgs, Record<string, unknown>> = {
+  name: "copyLastWeek",
+  description:
+    "Copy the PREVIOUS week's planning items into the target week (default: this week) as DRAFTS, skipping any that already exist there. Only items the user may edit are copied (their own / on their resource; super admins: everyone's). ALWAYS call WITHOUT confirm first to preview the count; call again with confirm:true only after the user agrees.",
+  parameters: weekParams as unknown as ToolDef["parameters"],
+  requiredModule: PLANNING_MODULE,
+  requiredAction: "create",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown>>> => {
+    const weekStart = weekStartInstant(args.week_start, ctx.timezone);
+    if (!weekStart) return { ok: false, permissionStatus: "allowed", data: null, message: "Give the week as a date like 2026-09-28." };
+    const caller = { account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: ctx.isSuperAdmin };
+    const scope = { weekStart, resourceIds: null, includeOpen: true, tz: ctx.timezone };
+    try {
+      if (args.confirm !== true) {
+        const r = await copyLastWeekCore(caller, scope, true);
+        if (r.count === 0) {
+          return { ok: true, permissionStatus: "allowed", data: { count: 0, skipped: r.skipped }, message: r.skipped ? `Nothing to copy — all ${r.skipped} item(s) from last week are already in this week.` : "Nothing to copy — last week has no items you can edit." };
+        }
+        return {
+          ok: true,
+          permissionStatus: "approval_required",
+          data: { preview: { week_start: weekStart, count: r.count, skipped: r.skipped } },
+          message: `Ready to copy ${r.count} item(s) from the previous week into the week of ${weekStart.slice(0, 10)} as drafts${r.skipped ? ` (${r.skipped} already there, skipped)` : ""}. Confirm?`,
+          pendingAction: { tool: "copyLastWeek", args: { week_start: args.week_start, confirm: true } },
+        };
+      }
+      const r = await copyLastWeekCore(caller, scope, false);
+      return { ok: true, permissionStatus: "allowed", data: { count: r.count, skipped: r.skipped }, message: `Copied ${r.count} item(s) as drafts${r.skipped ? `; ${r.skipped} already existed` : ""}.`, sources: ["planning_items(insert)"] };
+    } catch (e) {
+      console.error("[tool.copyLastWeek]", e);
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't copy last week — please try again." };
+    }
+  },
+};
+
+const publishWeek: ToolDef<WeekArgs, Record<string, unknown>> = {
+  name: "publishWeek",
+  description:
+    "Publish every DRAFT planning item in the target week (default: this week) that the user may edit, and notify each scheduled person once. ALWAYS call WITHOUT confirm first to preview the count; call again with confirm:true only after the user agrees.",
+  parameters: weekParams as unknown as ToolDef["parameters"],
+  requiredModule: PLANNING_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown>>> => {
+    const weekStart = weekStartInstant(args.week_start, ctx.timezone);
+    if (!weekStart) return { ok: false, permissionStatus: "allowed", data: null, message: "Give the week as a date like 2026-09-28." };
+    const caller = { account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: ctx.isSuperAdmin, username: ctx.auth.username };
+    const scope = { weekStart, resourceIds: null, includeOpen: true, tz: ctx.timezone };
+    try {
+      if (args.confirm !== true) {
+        const r = await publishWeekCore(caller, scope, true, () => {});
+        if (r.count === 0) return { ok: true, permissionStatus: "allowed", data: { count: 0 }, message: "No drafts to publish in that week." };
+        return {
+          ok: true,
+          permissionStatus: "approval_required",
+          data: { preview: { week_start: weekStart, count: r.count, people: r.people } },
+          message: `Ready to publish ${r.count} draft(s) in the week of ${weekStart.slice(0, 10)}; ${r.people} person(s) will be notified. Confirm?`,
+          pendingAction: { tool: "publishWeek", args: { week_start: args.week_start, confirm: true } },
+        };
+      }
+      const pending: Promise<void>[] = [];
+      const r = await publishWeekCore(caller, scope, false, (fn) => { pending.push(fn()); });
+      await Promise.all(pending);
+      return { ok: true, permissionStatus: "allowed", data: { count: r.count, people: r.people }, message: `Published ${r.count} item(s); ${r.people} person(s) notified.`, sources: ["planning_items(update)"] };
+    } catch (e) {
+      console.error("[tool.publishWeek]", e);
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't publish the week — please try again." };
+    }
+  },
+};
+
 export const planningTools: ToolDef[] = [
   listMyPlanning as ToolDef,
   createPlanningItem as ToolDef,
   updatePlanningItem as ToolDef,
   deletePlanningItem as ToolDef,
+  copyLastWeek as ToolDef,
+  publishWeek as ToolDef,
 ];

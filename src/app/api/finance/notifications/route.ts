@@ -1,10 +1,11 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { FinanceNotification } from "@/lib/finance/types";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 
 /* GET  /api/finance/notifications
  *   Returns scheduled + recently-sent reminders for the tenant. The UI
@@ -119,5 +120,8 @@ export async function PATCH(req: Request) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  /* Done, cancelled or snoozed: the reminder was answered, so its unread
+     copies leave everyone's bell (a snoozed one comes back when it re-fires). */
+  after(() => clearUnreadByMeta({ type: "finance_reminder", reminder_id: body.id }));
   return NextResponse.json({ notification: data });
 }

@@ -1,3 +1,3 @@
 "use client";
-import StatementReports from "@/components/reports/StatementReports";
-export default function Page() { return <StatementReports />; }
+import StatementNumbers from "@/components/reports/numbers/StatementNumbers";
+export default function Page() { return <StatementNumbers />; }

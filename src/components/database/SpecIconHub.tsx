@@ -13,7 +13,10 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import { listSchemas } from "@/lib/product-schema";
+/* The registry's list comes from /api/product-schema — importing the
+   barrel here shipped every template to the browser (validate:schema-barrel). */
+import { fetchAllSchemas } from "@/lib/product-schema-client";
+import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import IconBindingPicker from "./IconBindingPicker";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -62,18 +65,20 @@ export default function SpecIconHub() {
   const [openSchema, setOpenSchema] = useState<string | null>(null);
 
   useEffect(() => { void fetchIconBindings().then(setBindings); }, []);
+  const [allSchemas, setAllSchemas] = useState<ProductSchemaDefinition[]>([]);
+  useEffect(() => { let alive = true; void fetchAllSchemas().then((s) => { if (alive) setAllSchemas(s); }); return () => { alive = false; }; }, []);
 
   /* Deduped by schema id — dual bindings (XFFP fabric-prep, ironing-systems
      re-binds) describe the SAME fields; one entry per family is the truth. */
   const schemas = useMemo(() => {
     const seen = new Set<string>();
-    return listSchemas().filter((s) => {
+    return allSchemas.filter((s) => {
       const fam = s.name;
       if (seen.has(fam)) return false;
       seen.add(fam);
       return true;
     });
-  }, []);
+  }, [allSchemas]);
 
   const refresh = () => { invalidateIconBindings(); void fetchIconBindings().then(setBindings); };
 

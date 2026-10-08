@@ -6,8 +6,11 @@
    keeps the original inverted pill. */
 
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import KdsSelect from "@/components/kds/Select";
 import { useSkin } from "@/lib/appearance";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /** The ONE disclosure chevron for the Settings app — the master list, the
  *  admin link rows and the push link all draw this, so they can never drift
@@ -23,6 +26,26 @@ export function Chevron({ className = "", back = false }: { className?: string; 
     <svg className={`${facing} ${className}`} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/** Renders at the end of <body>. A settings card is frosted glass
+ *  (backdrop-filter), and a `fixed` dialog inside one is positioned against
+ *  the card, not the screen — so confirmations go through here. Tabs mount
+ *  on the client only, so `document` is always there. */
+export function BodyPortal({ children }: { children: ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
+
+/** A save that did not reach the server — the control has already been put
+ *  back to what is stored; this says why it moved. */
+export function SaveError({ show, text }: { show: boolean; text: string }) {
+  if (!show) return null;
+  return (
+    <p role="alert" className="rounded-xl border border-[#FF3333]/30 bg-[#FF3333]/[0.06] px-3 py-2 text-[12.5px] text-[#FF6B6B]">
+      {text}
+    </p>
   );
 }
 
@@ -259,12 +282,15 @@ export function ControlRow({ label, hint, children, last }: {
   label: string; hint?: string; children: ReactNode; last?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
+    /* On a phone the control goes UNDER its label: beside it, a three-way
+       choice squeezed the label to ~100 px (less in Arabic). From sm up the
+       row is side by side as before. */
+    <div className={`flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
       <div className="min-w-0">
         <p className="text-[13px] font-medium text-[var(--text-primary)]">{label}</p>
         {hint && <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{hint}</p>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="shrink-0 max-sm:overflow-x-auto max-sm:no-scrollbar">{children}</div>
     </div>
   );
 }
@@ -289,7 +315,9 @@ export function Segmented<T extends string | number>({ value, onChange, options 
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`px-3 h-7 rounded-md text-[12px] font-medium transition-colors ${
+            /* 36 px tall and at least 44 wide: h-7 was under the size a
+               finger can hit reliably. */
+            className={`px-3 h-9 min-w-11 rounded-md text-[12px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${
               active
                 ? aurora
                   ? "kx-seg-on text-[var(--text-primary)]"
@@ -308,10 +336,12 @@ export function Segmented<T extends string | number>({ value, onChange, options 
 /** iOS-style on/off switch row. ON = emerald green with a white knob — the
  *  ONE toggle design for the whole system (standing rule): green track when
  *  on, neutral track when off, white circle always. */
-export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
+export function SwitchRow({ label, hint, checked, onChange, last, icon, disabled }: {
   label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean;
   /** Optional leading glyph (Semantic Icon Registry). */
   icon?: React.ReactNode;
+  /** Shown but not flippable (e.g. decided elsewhere, or saving). */
+  disabled?: boolean;
 }) {
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
@@ -329,8 +359,11 @@ export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
+        /* The track stays 24 px; the ::before layer grows the hit area to
+           44 px so a thumb does not miss it. */
+        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 before:absolute before:-inset-2.5 before:content-[''] ${
           checked ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"
         }`}
       >
@@ -358,9 +391,51 @@ export function SelectControl<T extends string | number>({ value, onChange, opti
         if (match) onChange(match.value);
       }}
       options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+      /* On a phone ControlRow stacks and the wrapper spans the row, so the
+         trigger spans it too — sized to its label, the chevron (pinned to
+         the wrapper's end) floated off on its own. */
       wrapperClassName="shrink-0"
       panelWidthClassName="min-w-[11rem]"
-      triggerClassName="h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] ps-2.5 pe-7 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] text-start"
+      triggerClassName="max-sm:w-full h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] ps-2.5 pe-7 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] text-start"
     />
+  );
+}
+
+/** The Save bar of a draft-and-save tab (Profile, Koleex AI).
+ *
+ *  Drawn only while there is something to save or to say. It used to be
+ *  drawn always, as a full-width strip with a gradient scrim: the pane's
+ *  scroller carries the dock's 8rem clearance (.kx-dock-pad), so a sticky
+ *  bottom-0 strip rested 128px up the screen, and a disabled Save sat over
+ *  the settings, fading the row beneath it, with nothing to save.
+ *
+ *  Now a compact card at the end of the pane, clear of the dock and the
+ *  report button, covering one row at most while it is up. */
+export function SaveBar({ dirty, saving, error, toast, onSave, labels }: {
+  dirty: boolean; saving: boolean; error: string | null; toast: string | null;
+  onSave: () => void;
+  labels: { save: string; saving: string; unsaved: string };
+}) {
+  if (!dirty && !saving && !error && !toast) return null;
+  const status = error
+    ? <span role="alert" className="text-[12px] text-[#FF6B6B] min-w-0">{error}</span>
+    : toast && !dirty
+      ? <span role="status" className="text-[12px] text-[var(--text-secondary)] flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>
+      : <span className="text-[12px] text-[var(--text-dim)]">{labels.unsaved}</span>;
+  return (
+    <div className="sticky bottom-3 z-20 flex justify-end pointer-events-none">
+      <div className="kx-save-card pointer-events-auto flex max-w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] ps-4 pe-1.5 py-1.5 shadow-lg">
+        {status}
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!dirty || saving}
+          className="h-9 shrink-0 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+        >
+          {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
+          {saving ? labels.saving : labels.save}
+        </button>
+      </div>
+    </div>
   );
 }

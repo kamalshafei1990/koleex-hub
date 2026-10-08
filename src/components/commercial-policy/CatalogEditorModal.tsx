@@ -100,12 +100,12 @@ export function CatalogEditorModal({
     }
   }
 
-  const inputCls = "w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+  const inputCls = "w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4 py-10" onClick={onClose}>
       <div
-        className="w-full max-w-2xl rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)]">

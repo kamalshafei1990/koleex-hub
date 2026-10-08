@@ -8,6 +8,7 @@ export const customerProfileT: Translations = {
   // Not-found + loading
   "notFound.title": { en: "Customer not found", zh: "未找到客户", ar: "لم يتم العثور على العميل" },
   "notFound.back": { en: "Back to customers", zh: "返回客户列表", ar: "العودة إلى العملاء" },
+  "nav.customers": { en: "Customers", zh: "客户", ar: "العملاء" },
 
   // Header
   "header.title": { en: "Customer Profile", zh: "客户资料", ar: "ملف العميل" },
@@ -54,6 +55,12 @@ export const customerProfileT: Translations = {
   "card.empty.invoices": { en: "No invoices issued", zh: "暂无发票", ar: "لم يتم إصدار فواتير" },
   "card.empty.projects": { en: "No projects linked", zh: "暂无关联项目", ar: "لا توجد مشاريع مرتبطة" },
   "card.empty.tasks": { en: "No open tasks", zh: "暂无待办任务", ar: "لا توجد مهام مفتوحة" },
+
+  // Website messages (the public site's contact form and quotation requests)
+  "messages.title": { en: "Website messages", zh: "网站留言", ar: "رسائل الموقع" },
+  "messages.quote": { en: "Quotation request", zh: "询价", ar: "طلب عرض سعر" },
+  "messages.message": { en: "Message", zh: "留言", ar: "رسالة" },
+  "messages.latest": { en: "the latest 5", zh: "最近 5 条", ar: "آخر 5" },
 
   // Commercial tab
   "sec.salesCredit": { en: "Sales & Credit", zh: "销售与信用", ar: "المبيعات والائتمان" },

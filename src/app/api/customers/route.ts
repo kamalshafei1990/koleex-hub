@@ -11,6 +11,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { COUNTRIES } from "@/lib/commercial-policy/countries";
 interface PostBody {
   name?: string;
   company_name?: string | null;
@@ -78,8 +79,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required." }, { status: 400 });
   }
 
+  /* Every customer gets a permanent code the moment they exist, so the same
+     code appears on every document they ever receive. It carries meaning —
+     country prefix plus a per-country counter from 100, so BD-100 is the
+     first Bangladeshi customer (owner's choice, 2026-08-24).
+
+     Allocation is not fatal here, unlike a document number: a customer
+     without a code is still a usable customer and can be back-filled, while
+     refusing to create them over a counter would be the worse failure. */
+  let customerCode: string | null = null;
+  {
+    /* The country column holds a NAME ("Bangladesh"), not a code, so passing
+       it straight through produced BANGLADESH-100. Resolve to ISO alpha-2
+       against the canonical 199-country list; an unrecognised value falls
+       through to XX rather than becoming a long ugly prefix. */
+    const raw = (body.country ?? "").trim();
+    const iso =
+      raw.length === 2
+        ? raw.toUpperCase()
+        : COUNTRIES.find((c) => c.name.toLowerCase() === raw.toLowerCase())?.code ?? "";
+
+    const { data: code, error: codeErr } = await supabaseServer.rpc("next_customer_code", {
+      p_tenant: auth.tenant_id,
+      p_country: iso,
+    });
+    if (codeErr) console.warn("[customers] code allocation failed:", codeErr.message);
+    else if (typeof code === "string") customerCode = code;
+  }
+
   const { data, error } = await supabaseServer.from("customers").insert({
     tenant_id: auth.tenant_id,
+    customer_code: customerCode,
     name: body.name.trim(),
     company_name: body.company_name ?? null,
     email: body.email ?? null,

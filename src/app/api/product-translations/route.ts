@@ -7,6 +7,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
    DELETE on /[id]. */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
@@ -38,5 +39,6 @@ export async function POST(req: Request) {
     .from("product_translations")
     .upsert(body, { onConflict: "product_id,locale" });
   if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

@@ -1,0 +1,482 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   components/ai/Sidebar — the conversation list's rows, headings and menu.
+
+   Phase 2J, sliced verbatim from KoleexAiApp.tsx. Four prop-only components
+   plus the date grouper they are rendered from. Grouped in one file because
+   they are one concern: what the left panel is made of.
+   --------------------------------------------------------------------------- */
+
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import ProjectGlyph from "@/components/ai/ProjectGlyph";
+import type { AiProject } from "@/lib/ai-projects";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import PinIcon from "@/components/icons/ui/PinIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import PinOffIcon from "@/components/icons/ui/PinOffIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import type { ConversationRow, MenuItem } from "@/components/ai/types";
+import { COPY } from "@/components/ai/copy";
+import { textLang } from "@/lib/text-direction";
+
+/* ── Sidebar section heading ──
+   A date, "Projects" and "Pinned" are all chrome, not content. The label used
+   to be 10px bold text at rgba(255,255,255,0.44) sitting directly above chat
+   rows at 0.66 — two greys a fifth of an alpha apart, same left edge, no
+   separator — so "Yesterday" scanned as just another chat. The hairline rule
+   and the sticky behaviour are what make it read as a divider; every section
+   in the sidebar now shares this one component so they cannot drift apart. */
+export function SectionHeader({
+  label,
+  children,
+  muted,
+}: {
+  label: string;
+  children?: React.ReactNode;
+  /** Date sub-headings inside the history — quieter than "Projects" /
+   *  "Recents", which name the two halves of the panel. */
+  muted?: boolean;
+}) {
+  return (
+    <div className="px-4 pt-4 pb-1 flex items-center gap-2">
+      <span
+        className={`text-[12px] font-semibold shrink-0 ${
+          muted ? "text-[var(--text-dim)]" : "text-[var(--text-primary)]"
+        }`}
+      >
+        {label}
+      </span>
+      <span className="flex-1" />
+      {children}
+    </div>
+  );
+}
+
+/* ── A project folder row ──
+   Same shape as a chat row — icon, name, hover menu — because in the panel
+   they are peers: two kinds of thing you click to go somewhere. No chevron
+   and no count; the folder opens the panel rather than unfolding in place. */
+export function ProjectRow({
+  project,
+  onOpen,
+  onEdit,
+  onDelete,
+  editLabel,
+  deleteLabel,
+  moreLabel,
+}: {
+  project: AiProject;
+  onOpen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  editLabel: string;
+  deleteLabel: string;
+  moreLabel: string;
+}) {
+  return (
+    <div
+      className="group px-2 py-1.5 mx-2 rounded-lg transition-colors flex items-center gap-2 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+    >
+      {/* THE NAME IS THE BUTTON. A row that was itself role="button" held two
+          more buttons inside it, which the content model forbids and screen
+          readers flatten (audit, 2026-09-11). */}
+      <button type="button" onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-2 text-start rounded-lg">
+        <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
+        <span className="kx-ai-row-title text-[13px] truncate flex-1 min-w-0" dir="auto" lang={textLang(project.name)}>{project.name}</span>
+      </button>
+      <RowMenu
+        label={moreLabel}
+        items={[
+          { key: "edit", label: editLabel, icon: <PencilIcon className="h-3 w-3" />, onSelect: onEdit },
+          { key: "delete", label: deleteLabel, icon: <TrashIcon className="h-3 w-3" />, danger: true, onSelect: onDelete },
+        ]}
+      />
+    </div>
+  );
+}
+
+/* ── Sidebar row with hover actions ── */
+
+/* ONE ROW, REDRAWN ONLY WHEN ITS OWN THINGS CHANGE (deep check, 2026-09-24).
+   Every row used to take fresh arrow functions from the app, so each
+   streamed frame of a reply — about sixty a second — re-rendered every chat
+   in the list, hidden drawer or not. The handlers now take the row, the app
+   passes the same functions every time, and the row is memoised. */
+export const SidebarRow = memo(SidebarRowImpl);
+
+function SidebarRowImpl({
+  row,
+  active,
+  projects,
+  copy,
+  onOpen,
+  onRename,
+  onDelete,
+  onTogglePin,
+  onMove,
+  hint,
+  onExport,
+}: {
+  row: ConversationRow;
+  active: boolean;
+  projects: AiProject[];
+  copy: typeof COPY["en"];
+  onOpen: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+  onTogglePin: (row: ConversationRow) => void;
+  onMove: (row: ConversationRow, projectId: string | null) => void;
+  /** Where the search matched inside the chat (roadmap C2): one dim line
+   *  under the title, only while searching. Absent means the row is as it
+   *  always was. */
+  hint?: string;
+  /** One chat as a printable page (roadmap D5). Absent means no menu item. */
+  onExport?: (id: string) => void;
+}) {
+  const pinned = !!row.pinned;
+  const inProject = row.project_id ?? null;
+
+  /* Rename, pin, move and delete are four actions on a 248px row — as inline
+     buttons they would leave the title barely wider than a word. Pin stays
+     out (it is the one you reach for mid-thought, and it has to stay visible
+     when ON so you can see the chat is pinned); the rest live behind one
+     menu, which is also where "move to a folder" belongs since it needs the
+     project list. */
+  const items: MenuItem[] = [
+    {
+      key: "pin",
+      label: pinned ? copy.unpin : copy.pin,
+      icon: pinned ? <PinOffIcon className="h-3 w-3" /> : <PinIcon className="h-3 w-3" />,
+      onSelect: () => onTogglePin(row),
+    },
+    {
+      key: "rename",
+      label: copy.rename,
+      icon: <PencilIcon className="h-3 w-3" />,
+      onSelect: () => onRename(row.id, row.title),
+    },
+    { key: "sep-move", separator: true, label: copy.moveTo },
+    {
+      key: "none",
+      label: copy.noProject,
+      selected: inProject === null,
+      onSelect: () => onMove(row, null),
+    },
+    ...projects.map((p) => ({
+      key: `p-${p.id}`,
+      label: p.name,
+      icon: <ProjectGlyph icon={p.icon} color={p.color} size={12} />,
+      selected: inProject === p.id,
+      onSelect: () => onMove(row, p.id),
+    })),
+    ...(onExport
+      ? [{ key: "export", label: copy.exportChat, icon: <Share2Icon className="h-3 w-3" />, onSelect: () => onExport(row.id) } as MenuItem]
+      : []),
+    { key: "sep-danger", separator: true },
+    {
+      key: "delete",
+      label: copy.delete,
+      icon: <TrashIcon className="h-3 w-3" />,
+      danger: true,
+      onSelect: () => onDelete(row.id),
+    },
+  ];
+
+  return (
+    <div
+      /* THE TITLE IS THE BUTTON. The row was role="button" with the pin and
+         the menu — two more buttons — inside it, which the content model
+         forbids and screen readers flatten; a keyboard reached it (audit,
+         2026-09-07) but announced it wrong (audit, 2026-09-11). */
+      className={`group px-2 py-1.5 mx-2 rounded-lg transition-colors flex items-center gap-1 ${
+        active
+          ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
+          : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      }`}
+    >
+      <button type="button" onClick={() => onOpen(row.id)} className="flex-1 min-w-0 text-start rounded-lg" aria-current={active ? "page" : undefined}>
+        {/* THE TITLE KEEPS THE LIST'S EDGE. dir="auto" shapes an Arabic title
+            correctly, but on its own it also right-aligned it, so in an
+            English sidebar Arabic chats sat against the pin while English
+            ones sat against the icon — two columns in one list (owner,
+            2026-09-13, against the ChatGPT sidebar). .kx-ai-row-title pins
+            the alignment to the screen's side and, through lang, sizes
+            Arabic and Chinese titles for their own scripts. */}
+        <span className="kx-ai-row-title block text-[13px] truncate" dir="auto" lang={textLang(row.title)}>{row.title}</span>
+        {hint && <span className="kx-ai-row-title block text-[12px] truncate text-[var(--text-dim)]" dir="auto" lang={textLang(hint)} data-search-hint>{hint}</span>}
+      </button>
+      {/* ONLY A PINNED ROW SHOWS THE PIN (UI/UX pass, 2026-09-24). On a phone
+          — no hover — every row used to carry a pin, so a list of twenty
+          chats read as twenty pins. Pinning lives in the row's menu; the
+          mark here says "this one is pinned" and a tap on it unpins. */}
+      {pinned && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onTogglePin(row); }}
+          className="h-6 w-6 rounded-lg flex items-center justify-center shrink-0 text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
+          title={copy.unpin}
+          aria-label={copy.unpin}
+          aria-pressed
+        >
+          <PinIcon className="h-3 w-3" />
+        </button>
+      )}
+      <RowMenu label={copy.more} items={items} />
+    </div>
+  );
+}
+
+/* ── The one-button row menu ──
+   Rendered `position: fixed` against the trigger's own rectangle rather than
+   absolutely inside the row. The sidebar list is an overflow-y-auto column,
+   which clips on BOTH axes, so an absolutely-positioned panel would have its
+   edge sliced off — and a menu you cannot fully see is worse than no menu. */
+
+export function RowMenu({
+  label,
+  items,
+  alwaysVisible,
+}: {
+  label: string;
+  items: MenuItem[];
+  /** The project header's menu has no row to hover — it stays put. */
+  alwaysVisible?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
+  const [dir, setDir] = useState<"ltr" | "rtl">("ltr");
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  /* Closing by keyboard or by choosing hands focus back to the trigger; the
+     first item takes focus when the menu opens (audit, 2026-09-11). */
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    btnRef.current?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open]);
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const go = (n: number) => { e.preventDefault(); items[(n + items.length) % items.length].focus(); };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(items.length - 1);
+    else if (e.key === "Tab") { e.preventDefault(); closeMenu(); }
+  };
+
+  const place = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const W = 208;
+    const GAP = 4;
+    const EDGE = 8;
+    const PREFERRED_H = 320;
+
+    const below = window.innerHeight - r.bottom - GAP - EDGE;
+    const above = r.top - GAP - EDGE;
+    /* Open downwards when there is room, otherwise flip above. When flipping
+       we anchor the panel's BOTTOM edge to the button instead of guessing a
+       top: the menu's height depends on how many projects exist, and a top
+       computed from the maximum height would leave a short menu floating a
+       hundred pixels away from the button that opened it. */
+    const dropDown = below >= Math.min(PREFERRED_H, above) || below >= 200;
+    /* Hang from the button's outer edge: its right in English and Chinese,
+       its left in Arabic, where the menu would otherwise open over the
+       chat list's own edge. */
+    const rtl = getComputedStyle(el).direction === "rtl";
+    setDir(rtl ? "rtl" : "ltr");
+    const left = Math.min(Math.max(EDGE, rtl ? r.left : r.right - W), window.innerWidth - W - EDGE);
+
+    setPos(
+      dropDown
+        ? { top: r.bottom + GAP, left, maxHeight: Math.max(120, below) }
+        : { bottom: window.innerHeight - r.top + GAP, left, maxHeight: Math.max(120, above) },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    /* Any scroll or resize invalidates a fixed position, and re-placing a
+       menu mid-scroll looks broken — closing is the honest response.
+       EXCEPT THE MENU'S OWN SCROLL. The listener is on capture, so it also
+       heard the menu scrolling itself: on a phone with a few projects the
+       menu is taller than its cap, and a swipe down to Delete or Export —
+       or arrowing to them — closed it, so they could not be reached
+       (review, 2026-09-26). */
+    const close = (e: Event) => {
+      if (e.target instanceof Node && menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
+    /* ESCAPE CLOSES THE MENU AND NOTHING ELSE. On capture and stopped
+       outright, and marked handled, so the drawer under it does not close
+       on the same key press. */
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeMenu();
+    };
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [open, closeMenu]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open) place();
+          setOpen((v) => !v);
+        }}
+        className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
+          open || alwaysVisible
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100"
+        } ${open ? "text-[var(--text-primary)]" : ""}`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreHorizontalIcon size={14} />
+      </button>
+
+      {open && pos && createPortal(
+        <>
+          {/* Click-catcher. Transparent, not dimmed — this is a small row
+              menu, not a modal, and the house rule about blurring backdrops
+              is about dialogs that take over the screen. */}
+          <div
+            className="fixed inset-0 z-[60]"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            onContextMenu={(e) => { e.preventDefault(); setOpen(false); }}
+          />
+          {/* MN-5 canon: kx-pop-panel is the shell + (under aurora) the
+              frosted material. PORTALLED to <body>, and that part is
+              load-bearing: this menu used to render inside the sidebar,
+              whose .kx-glass-drawer backdrop-filter both starves any
+              descendant blur and made the "glass" read as a flat
+              see-through box (owner: "not frosted blurred glass"). */}
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={label}
+            onKeyDown={onMenuKey}
+            dir={dir}
+            className="kx-pop-panel kx-ai-tokens fixed z-[61] w-52 overflow-y-auto py-1"
+            style={{
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
+              maxHeight: Math.min(320, pos.maxHeight),
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {items.map((it) =>
+              it.separator ? (
+                <div key={it.key} className="px-3 pt-2 pb-1">
+                  {it.label ? (
+                    <span className="text-[12px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">
+                      {it.label}
+                    </span>
+                  ) : (
+                    <span className="block h-px bg-[var(--border-subtle)]" />
+                  )}
+                </div>
+              ) : (
+                <button
+                  key={it.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeMenu();
+                    it.onSelect?.();
+                  }}
+                  /* 44 px rows where the pointer is a finger — at 12 px text and
+                     6 px padding a thumb covered two items at once. */
+                  className={`w-full px-3 py-1.5 [@media(pointer:coarse)]:min-h-11 text-[13px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] focus:outline-none focus-visible:bg-[var(--bg-surface-subtle)] ${
+                    it.danger
+                      ? "text-[var(--kx-ai-danger-text)]"
+                      : it.selected
+                        ? "text-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)]"
+                  }`}
+                >
+                  <span className="w-3 shrink-0 flex justify-center">{it.icon}</span>
+                  <span className="truncate flex-1 min-w-0">{it.label}</span>
+                  {it.selected && <CheckIcon className="h-3 w-3 shrink-0" />}
+                </button>
+              ),
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+
+/* ── Date grouping ── */
+
+export function groupByDate(
+  rows: ConversationRow[],
+  copy: typeof COPY["en"],
+  /** The day the groups are counted from — the caller passes it, so the
+   *  groups are recomputed when the day turns (default: now). */
+  now: Date = new Date(),
+): Array<{ label: string; rows: ConversationRow[] }> {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const oneDay = 86_400_000;
+  const bucket = {
+    today: [] as ConversationRow[],
+    yesterday: [] as ConversationRow[],
+    week: [] as ConversationRow[],
+    month: [] as ConversationRow[],
+    older: [] as ConversationRow[],
+  };
+  for (const r of rows) {
+    const t = new Date(r.updated_at).getTime();
+    const diff = today - t;
+    if (t >= today) bucket.today.push(r);
+    else if (diff < oneDay) bucket.yesterday.push(r);
+    else if (diff < 7 * oneDay) bucket.week.push(r);
+    else if (diff < 30 * oneDay) bucket.month.push(r);
+    else bucket.older.push(r);
+  }
+  const out: Array<{ label: string; rows: ConversationRow[] }> = [];
+  if (bucket.today.length) out.push({ label: copy.today, rows: bucket.today });
+  if (bucket.yesterday.length) out.push({ label: copy.yesterday, rows: bucket.yesterday });
+  if (bucket.week.length) out.push({ label: copy.previous7, rows: bucket.week });
+  if (bucket.month.length) out.push({ label: copy.previous30, rows: bucket.month });
+  if (bucket.older.length) out.push({ label: copy.earlier, rows: bucket.older });
+  return out;
+}

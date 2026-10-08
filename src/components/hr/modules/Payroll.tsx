@@ -41,6 +41,8 @@ import WalletIcon from "@/components/icons/ui/WalletIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PrinterIcon from "@/components/icons/ui/PrinterIcon";
+import PayrollRunPanel from "./PayrollRun";
 
 /* Salaries here are paid from the Chinese entity, so CNY leads and is the
    default. Kept as a closed list because the register is read by payroll and
@@ -52,7 +54,7 @@ const DEFAULT_SALARY_CURRENCY = "CNY";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
+export default function PayrollModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [salaryRecords, setSalaryRecords] = useState<SalaryRecordWithName[]>([]);
   const [payslips, setPayslips] = useState<PayslipWithName[]>([]);
@@ -216,7 +218,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
 
   /* ── render ── */
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-[18px] font-semibold text-[var(--text-primary)]">
@@ -233,6 +235,10 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
           </button>
         </div>
       </div>
+
+      {/* ── Payroll run (Phase D) — the month, generated from the register,
+          the attendance sheet and the country's rules ── */}
+      <PayrollRunPanel t={t} onChanged={async () => setPayslips(await fetchPayslips())} />
 
       {/* ── Salary Register ── */}
       <div className={cardCls}>
@@ -352,6 +358,16 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
                       map={PAYSLIP_STATUS_MAP}
                       label={tStatus(ps.status)}
                     />
+                    <a
+                      href={`/payslips/${ps.id}/print?auto=1`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-7 w-7 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center"
+                      title={t("hr.pay.print")}
+                      aria-label={t("hr.pay.print")}
+                    >
+                      <PrinterIcon className="h-3.5 w-3.5" />
+                    </a>
                     <button
                       type="button"
                       onClick={() =>

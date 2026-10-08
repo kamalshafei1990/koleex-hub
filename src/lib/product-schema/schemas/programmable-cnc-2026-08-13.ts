@@ -55,7 +55,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -299,7 +298,6 @@ export const PROGRAMMABLE_CNC_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(70),
     physicalGroup(80),
-    packingShippingGroup(90),
     safetyComplianceGroup(100),
   ],
 };

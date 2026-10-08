@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- KOLEEX K monogram tile. Square on purpose: platforms apply their own mask. -->
+  <rect width="1024" height="1024" fill="#0A0A0A"/>
+  <path fill="#FFFFFF" transform="translate(276.48 291.95) scale(4.04014)" d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z"/>
+</svg>

@@ -15,7 +15,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 const TABLE = "landed_cost_simulations";
 
@@ -40,6 +40,11 @@ export function pickWritable(body: Record<string, unknown>): Record<string, unkn
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  /* Landed-cost simulations carry unit_price + full cost breakdowns — gate the
+     read to the Landed Cost module (was: any authenticated account, incl.
+     customer-scope roles, could list every simulation). */
+  const deny = await requireModuleAccess(auth, "Landed Cost");
+  if (deny) return deny;
 
   const { data, error } = await supabaseServer
     .from(TABLE)

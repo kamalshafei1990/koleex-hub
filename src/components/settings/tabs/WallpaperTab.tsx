@@ -26,7 +26,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
-import { withDefaults } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { uploadToStorage } from "@/lib/storage-client";
 import { useTranslation } from "@/lib/i18n";
@@ -35,10 +34,11 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
-  asImage, effectiveTint, isShader, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
+  asImage, effectiveTint, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
-import { SettingsCard, ControlRow, SelectControl } from "./ui";
+import { SettingsCard, ControlRow, SelectControl, BodyPortal } from "./ui";
+import { useConfirm } from "@/components/kds/useConfirm";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -87,17 +87,17 @@ export default function WallpaperTab(
     savePref.current = null;
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     if (!next) return;
-    const prefs = withDefaults(account.preferences);
-    /* REFRESH AFTER THE SAVE, and it is not politeness — it is the second half
-       of an earlier bug. Every settings writer sends
-       `withDefaults(account.preferences)` WHOLESALE, so a writer holding a
-       stale account re-saves the wallpaper it was loaded with and undoes a
-       newer choice. Measured: pick Ember, switch language, reload — the ground
-       came back Tide. Telling identity the account moved keeps the next
-       writer's copy current. */
-    void updateAccountPreferences(account.id, { ...prefs, wallpaper: next })
-      .then(() => onChanged?.());
-  }, [account, onChanged]);
+    /* ONLY THE WALLPAPER SLICE (Settings audit, 29/09/2026). This used to send
+       `withDefaults(account.preferences)` whole, so picking a wallpaper wrote
+       back this screen's copy of every other preference — Home's My apps, the
+       language push notifications use, a pause taken from the bell — undoing
+       whatever had changed since the account was loaded. */
+    void updateAccountPreferences(account.id, { wallpaper: next })
+      .then((ok) => {
+        if (ok) onChanged?.();
+        else setError(t("saveFailed"));
+      });
+  }, [account, onChanged, t]);
 
   const choose = useCallback((next: WallpaperPref) => {
     announceWallpaper(next);                 // instant, and never touches the network
@@ -154,6 +154,7 @@ export default function WallpaperTab(
     }
   };
 
+  const { askConfirm, confirmDialog } = useConfirm();
   const removePhoto = () => {
     const path = current.photoPath;
     choose({ id: DEFAULT_WALLPAPER_ID });
@@ -165,6 +166,7 @@ export default function WallpaperTab(
 
   return (
     <div className="space-y-4">
+      <BodyPortal>{confirmDialog}</BodyPortal>
       <SettingsCard title={t("wp.title")} subtitle={t("wp.subtitle")}>
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -263,7 +265,7 @@ export default function WallpaperTab(
                 fit={current.fit} onClick={() => { /* already active */ }}
               />
               <button
-                type="button" onClick={removePhoto} title={t("wp.removePhoto")}
+                type="button" onClick={() => askConfirm(t("wp.removePhotoConfirm"), removePhoto, { confirmLabel: t("wp.removePhoto"), cancelLabel: t("confirm.cancel") })} title={t("wp.removePhoto")}
                 className="absolute -top-1.5 -end-1.5 w-6 h-6 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 flex items-center justify-center"
               >
                 <TrashIcon className="h-3 w-3" />
