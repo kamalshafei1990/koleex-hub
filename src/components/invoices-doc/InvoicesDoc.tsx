@@ -43,6 +43,7 @@ import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -1811,14 +1812,9 @@ export default function Quotations() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/quotations/saved-assets", {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          stampUrl: string | null;
-          signatureUrl: string | null;
-        };
+        /* Shared tenant fetch (lib/tenant-assets) — one request per session. */
+        const json = await fetchSavedAssets();
+        if (!json) return;
         if (cancelled) return;
         setSavedStampUrl(json.stampUrl);
         setSavedSignatureUrl(json.signatureUrl);
@@ -1861,6 +1857,7 @@ export default function Quotations() {
           return;
         }
         const json = (await res.json()) as { kind: string; url: string };
+        invalidateSavedAssets();
         if (kind === "stamp") {
           setSavedStampUrl(json.url);
           if (current) setCurrent({ ...current, stampUrl: json.url });

@@ -33,6 +33,7 @@ import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
 import type { ContractRef, ContractRow, ContractTerms, InvoiceLite } from "./types";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 import {
   ArrowLeftIcon,
   ContractIcon,
@@ -178,9 +179,9 @@ export default function ContractDoc({ id }: { id: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { stampUrl: string | null; signatureUrl: string | null };
+        /* Shared tenant fetch (lib/tenant-assets) — one request per session. */
+        const json = await fetchSavedAssets();
+        if (!json) return;
         if (cancelled) return;
         setSavedStampUrl(json.stampUrl);
         setSavedSignatureUrl(json.signatureUrl);
@@ -209,6 +210,7 @@ export default function ContractDoc({ id }: { id: string }) {
       const json = (await res.json()) as { url?: string };
       if (!json.url) return;
       const url = json.url;
+      invalidateSavedAssets();
       if (kind === "stamp") {
         setSavedStampUrl(url);
         setTerms((t) => ({ ...t, stampUrl: url }));

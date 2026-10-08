@@ -43,6 +43,7 @@ import { type CustomerPickResult } from "./CustomerPickerModal";
 import { record, event } from "@/lib/perf/client";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
@@ -2597,14 +2598,10 @@ export default function Quotations() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/quotations/saved-assets", {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          stampUrl: string | null;
-          signatureUrl: string | null;
-        };
+        /* Shared tenant fetch — one network request for the whole session,
+           not one per document surface (lib/tenant-assets). */
+        const json = await fetchSavedAssets();
+        if (!json) return;
         if (cancelled) return;
         setSavedStampUrl(json.stampUrl);
         setSavedSignatureUrl(json.signatureUrl);
@@ -2647,6 +2644,9 @@ export default function Quotations() {
           return;
         }
         const json = (await res.json()) as { kind: string; url: string };
+        /* The write succeeded — the shared cache must not hand the OLD
+           asset to the next surface that asks (lib/tenant-assets). */
+        invalidateSavedAssets();
         if (kind === "stamp") {
           setSavedStampUrl(json.url);
           if (current) setCurrent({ ...current, stampUrl: json.url });

@@ -11,6 +11,7 @@ import { settingsT } from "@/lib/translations/settings";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { BodyPortal } from "./ui";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 
 type Kind = "stamp" | "signature";
 interface Assets { stampUrl: string | null; signatureUrl: string | null }
@@ -24,8 +25,10 @@ export default function StampSignatureTab() {
 
   const load = async () => {
     try {
-      const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
-      if (res.ok) setAssets((await res.json()) as Assets);
+      /* Shared tenant fetch (lib/tenant-assets) — one request per session;
+         writers invalidate below so post-upload/removal reloads stay fresh. */
+      const json = await fetchSavedAssets();
+      if (json) setAssets(json);
     } finally {
       setLoading(false);
     }
@@ -52,6 +55,7 @@ export default function StampSignatureTab() {
         return;
       }
       setMsg({ kind: "ok", text: kind === "stamp" ? t("assets.stampUpdated") : t("assets.sigUpdated") });
+      invalidateSavedAssets();
       await load();
     } finally { setBusy(null); }
   }
@@ -73,6 +77,7 @@ export default function StampSignatureTab() {
       });
       if (!res.ok) { setMsg({ kind: "err", text: t("assets.removeFailed").replace("{code}", String(res.status)) }); return; }
       setMsg({ kind: "ok", text: t("assets.removed") });
+      invalidateSavedAssets();
       await load();
     } finally { setBusy(null); }
   }

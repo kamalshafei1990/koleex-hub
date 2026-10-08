@@ -23,6 +23,7 @@ import { useToast } from "@/components/kds/useToast";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import DocToolbar, { type SaveState } from "@/components/documents/DocToolbar";
+import { fetchSavedAssets, invalidateSavedAssets } from "@/lib/tenant-assets";
 import { saveDocument, removeDocument, type DocumentRow } from "@/lib/documents-store";
 import { downloadDocXlsx } from "@/lib/excel-export";
 import { useScopeContext } from "@/lib/use-scope";
@@ -232,9 +233,9 @@ export default function PackingListDoc({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { stampUrl: string | null; signatureUrl: string | null };
+        /* Shared tenant fetch (lib/tenant-assets) — one request per session. */
+        const json = await fetchSavedAssets();
+        if (!json) return;
         if (cancelled) return;
         setSavedStampUrl(json.stampUrl);
         setSavedSignatureUrl(json.signatureUrl);
@@ -251,6 +252,7 @@ export default function PackingListDoc({
       const res = await fetch("/api/quotations/saved-assets", { method: "POST", credentials: "include", body: form });
       if (!res.ok) { const j = await res.json().catch(() => ({})); showToast(`Upload failed: ${humanizeError(j.error)}`, "error"); return; }
       const json = (await res.json()) as { kind: string; url: string };
+      invalidateSavedAssets();
       if (kind === "stamp") { setSavedStampUrl(json.url); setMedia("stampUrl", json.url); }
       else { setSavedSignatureUrl(json.url); setMedia("signatureUrl", json.url); }
     } catch (e) { showToast(`Upload failed: ${humanizeError(e)}`, "error"); }
