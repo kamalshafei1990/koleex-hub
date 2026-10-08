@@ -28,6 +28,20 @@ const SUPABASE_HOST = (() => {
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /* AI-generated files (images, PDFs) download from OUR domain. The media
+     bucket is public-by-design — the random UUID path is the token — and
+     this rewrite proxies the exact same bytes, so access semantics are
+     unchanged while the chat link reads hub.koleexgroup.com instead of a
+     storage host the user has never heard of. Scoped to the ai-generated
+     prefix only; no other bucket path is proxied. */
+  async rewrites() {
+    return [
+      {
+        source: "/ai/files/:path*",
+        destination: `https://${SUPABASE_HOST}/storage/v1/object/public/media/ai-generated/:path*`,
+      },
+    ];
+  },
   /* China remediation R3 (stage 1): first-party image delivery. The browser
      requests /_next/image on OUR origin (proven ~99% reachable from mainland
      China); Vercel fetches the original from Supabase server-side (hnd1 <->

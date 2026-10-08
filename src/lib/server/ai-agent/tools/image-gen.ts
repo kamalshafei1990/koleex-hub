@@ -36,8 +36,7 @@ import type { ToolDef, ToolResult } from "../types";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "../../ai/security/rate-limit";
 import { generateImage, EXT_FOR, MAX_PROMPT_CHARS, type ImageMime } from "../../ai/image-gen";
-import { supabaseServer } from "../../supabase-server";
-import { isUuid } from "../uuid";
+import { storeGeneratedFile } from "../../ai/generated-storage";
 
 interface ImageArgs {
   prompt: string;
@@ -66,23 +65,11 @@ export const FAILED_MESSAGE =
 export const OVER_BUDGET_MESSAGE =
   "The image allowance for now is used up. Say so plainly and suggest trying again later.";
 
-const BUCKET = "media";
-const PREFIX = "ai-generated";
-
-/** The real store: the Hub's public media bucket, under the caller's own
- *  tenant and account so a path can never be guessed into someone else's. */
+/** The real store: the Hub's media bucket under the caller's own tenant and
+ *  account, and the URL on OUR domain — the shared home both generation
+ *  tools use (see ai/generated-storage.ts). */
 async function storeInMedia(tenantId: string, accountId: string, bytes: Uint8Array, mime: ImageMime): Promise<string | null> {
-  if (!isUuid(tenantId) || !isUuid(accountId)) return null;
-  const path = `${PREFIX}/${tenantId}/${accountId}/${crypto.randomUUID()}.${EXT_FOR[mime]}`;
-  const { error } = await supabaseServer.storage
-    .from(BUCKET)
-    .upload(path, bytes, { contentType: mime, upsert: false, cacheControl: "31536000" });
-  if (error) {
-    console.error("[ai.image] store failed", error.message);
-    return null;
-  }
-  const { data } = supabaseServer.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl || null;
+  return storeGeneratedFile(tenantId, accountId, bytes, mime, EXT_FOR[mime]);
 }
 
 const generateImageTool: ToolDef<ImageArgs, ImageData> = {

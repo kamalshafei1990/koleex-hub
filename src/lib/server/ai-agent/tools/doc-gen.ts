@@ -34,8 +34,7 @@ import "server-only";
 import type { ToolDef, ToolResult } from "../types";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "../../ai/security/rate-limit";
 import { sanitizeDocInput, renderDocumentPdf, type DocInput } from "../../ai/doc-gen";
-import { supabaseServer } from "../../supabase-server";
-import { isUuid } from "../uuid";
+import { storeGeneratedFile } from "../../ai/generated-storage";
 
 interface DocArgs {
   title: string;
@@ -73,23 +72,11 @@ export const DOC_FAILED_MESSAGE =
 export const DOC_OVER_BUDGET_MESSAGE =
   "The document allowance for now is used up. Say so plainly and suggest trying again later.";
 
-const BUCKET = "media";
-const PREFIX = "ai-generated";
-
-/** The real store: the Hub's public media bucket, under the caller's own
- *  tenant and account — the same prefix and rule the image tool uses. */
+/** The real store: the Hub's media bucket under the caller's own tenant and
+ *  account, and the URL on OUR domain — the shared home both generation
+ *  tools use (see ai/generated-storage.ts). */
 async function storePdf(tenantId: string, accountId: string, bytes: Uint8Array): Promise<string | null> {
-  if (!isUuid(tenantId) || !isUuid(accountId)) return null;
-  const path = `${PREFIX}/${tenantId}/${accountId}/${crypto.randomUUID()}.pdf`;
-  const { error } = await supabaseServer.storage
-    .from(BUCKET)
-    .upload(path, bytes, { contentType: "application/pdf", upsert: false, cacheControl: "31536000" });
-  if (error) {
-    console.error("[ai.doc] store failed", error.message);
-    return null;
-  }
-  const { data } = supabaseServer.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl || null;
+  return storeGeneratedFile(tenantId, accountId, bytes, "application/pdf", "pdf");
 }
 
 const generateDocumentTool: ToolDef<DocArgs, DocData> = {
