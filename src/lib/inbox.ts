@@ -52,12 +52,16 @@ async function inboxMutate(payload: Record<string, unknown>): Promise<{ ok: bool
    (/api/inbox/feed, service-role + session recipient scope) so inbox_messages'
    last public policy (SELECT) can be dropped. Freshness via Broadcast pings. */
 async function inboxFeed<T>(resource: string, params: Record<string, string> = {}): Promise<T | undefined> {
+  const qs = new URLSearchParams({ resource, ...params }).toString();
   try {
-    const qs = new URLSearchParams({ resource, ...params }).toString();
-    const res = await fetch(`/api/inbox/feed?${qs}`, { method: "GET", credentials: "include" });
-    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: T; error?: string };
-    if (!res.ok || !j.ok) {
-      const msg = j.error ?? `HTTP ${res.status}`;
+    /* Coalesced (lib/client-cache, 2 s): the NotificationBell and the header
+       gate mount together and each opened the SAME request — measured ×2 at
+       1.1-1.5 s apiece on one screen (2026-10-08), pure fan-out. A 2 s window
+       plus the existing write/broadcast invalidations keeps freshness where
+       the 5 s badge window already put it; failures still cache NOTHING. */
+    const j = await cachedGet<{ ok?: boolean; data?: T; error?: string }>(`/api/inbox/feed?${qs}`, 2_000);
+    if (!j.ok) {
+      const msg = j.error ?? "feed not ok";
       // Logged-out / bootstrapping windows are expected on the always-mounted
       // bell — stay silent, like the old anon reads did.
       const authNoise = /not signed in|unauthor|forbidden|\b401\b|\b403\b/i.test(msg);
