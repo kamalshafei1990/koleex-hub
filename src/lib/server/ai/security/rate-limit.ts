@@ -175,6 +175,20 @@ export const BUDGETS = {
     windowSec: 86_400,
     max: num(process.env.AI_LIMIT_TENANT_IMAGES_PER_DAY, 100),
   }),
+  /* A generated PDF document. No vendor is paid — the cost is Chromium CPU
+     inside our own function — so the ceilings sit above the image ones, but
+     a document loop is still a function-abuse vector and gets its own
+     bucket rather than riding the image one. */
+  docPerAccount: (): Budget => ({
+    bucket: "doc",
+    windowSec: 3600,
+    max: num(process.env.AI_LIMIT_DOCS_PER_HOUR, 30),
+  }),
+  docPerTenant: (): Budget => ({
+    bucket: "doc:tenant",
+    windowSec: 86_400,
+    max: num(process.env.AI_LIMIT_TENANT_DOCS_PER_DAY, 300),
+  }),
 } as const;
 
 export type LimitResult =

@@ -72,6 +72,10 @@ import { webSearchTools } from "./tools/web-search";
 /* A picture made to order — budgeted per call, stored in the Hub's own
    bucket, never shown as a product. See tools/image-gen.ts. */
 import { imageGenTools } from "./tools/image-gen";
+/* A document made to order — the PDF counterpart of the image tool:
+   model-structured content, our renderer, our bucket, never an official
+   business document. See tools/doc-gen.ts. */
+import { docGenTools } from "./tools/doc-gen";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -100,6 +104,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
   ...knowledgeSearchTools,
       ...webSearchTools,
       ...imageGenTools,
+      ...docGenTools,
     ].map((t) => [t.name, t]),
   ),
 );
