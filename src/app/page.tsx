@@ -280,10 +280,9 @@ function estimateLauncherColumns(): number {
   return launcherColumns(Math.min(vw, 1400) - (vw >= 768 ? 80 : 32));
 }
 
-/** The Koleex AI tile's orb, as a multiple of the icon slot (30/34 px):
- *  54/61 px. Checked in a rendered tile at 1, 1.7, 1.8 and 1.9 — the sphere
- *  stays clear of the label below it at every one. */
-const AI_TILE_ORB = 1.15;
+/* (AI_TILE_ORB removed 2026-10-08: the tile no longer inflates the orb —
+   KoleexOrbIcon's own weighting is the single rule, per the owner's
+   "much more bigger than others" correction.) */
 
 /* The tiles that count something of their own: Discuss its unread messages,
    To-do the open tasks on you, Projects your open tasks, Planning your
@@ -420,19 +419,17 @@ const AppCard = memo(function AppCard({
                  mask — owner: "the Koleex AI Icon should be our Animated AI
                  face (orb)". The orb is the product's identity and it moves;
                  a bound icon is a flat SVG mask and can never be it. */
-              /* BIGGER IN ITS TILE (owner, 2026-09-23, on the Koleex AI app
-                 tile: "make the new orb … more bigger — I mean the app
-                 icon"). The orb draws its sphere inside a margin, so at the
-                 line icons' 30/34 px it read as a small ring beside full-
-                 bleed glyphs. It is drawn at AI_TILE_ORB × the icon slot and
-                 centred on the slot, which keeps its 30/34 px layout box: the
-                 tile, the label and the grid do not move. Drawn at size, not
-                 CSS-scaled, so the dots stay sharp. */
-              const orbPx = Math.round(iconPx * AI_TILE_ORB);
+              /* SAME WEIGHT AS EVERY OTHER ICON (owner, 2026-10-07: "the AI
+                 Icon … much more bigger than others"). The tile used to
+                 inflate the orb 1.15× AND force scale-100, bypassing the
+                 0.78 weighting KoleexOrbIcon applies everywhere else — its
+                 canvas measured 46px in a 34px slot. Now the tile renders
+                 the icon exactly like the dock and settings do: one size,
+                 one weight, one rule living in KoleexOrbIcon. */
               return (
                 <span className="relative block" style={{ width: iconPx, height: iconPx }}>
                   <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <AnimatedIcon size={orbPx} animated scaleClass="scale-100" />
+                    <AnimatedIcon size={iconPx} animated />
                   </span>
                 </span>
               );
