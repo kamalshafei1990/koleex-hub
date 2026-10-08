@@ -19,7 +19,10 @@ import "server-only";
      AI_IMAGE_BASE_URL     e.g. https://<host>/v1   (the adapter appends /images/generations)
      AI_IMAGE_API_KEY
      AI_IMAGE_MODEL        the vendor's model id
-     AI_IMAGE_SIZE         optional; default 1024x1024
+     AI_IMAGE_SIZE         optional; default 1024x1024; the literal "none" OMITS
+                           the field entirely — for vendors with their own sizing
+                           vocabulary (xAI takes aspect_ratio/resolution via
+                           AI_IMAGE_EXTRA_BODY, and 400s on `size`)
      AI_IMAGE_EXTRA_BODY   optional JSON merged into every request (a vendor's own switches)
 
    INERT UNTIL CONFIGURED. With the variables unset the tool reports plainly
@@ -50,7 +53,8 @@ import "server-only";
 export interface ImageGenConfig {
   readonly url: string;
   readonly model: string;
-  readonly size: string;
+  /* null = the request carries no `size` at all (AI_IMAGE_SIZE=none). */
+  readonly size: string | null;
   readonly label: string;
 }
 
@@ -108,6 +112,12 @@ export function parseImageExtraBody(raw: string | undefined): Record<string, unk
   return out;
 }
 
+/* "none" means the vendor wants NO size field at all — xAI's Imagine 2.0, for
+   example, 400s on `size` and takes aspect_ratio/resolution instead, which ride
+   in AI_IMAGE_EXTRA_BODY. The adapter cannot know each vendor's vocabulary, so
+   the operator spells it. */
+const OMIT_SIZE = "none";
+
 function validSize(raw: string | undefined): string | null {
   const s = raw?.trim() || DEFAULT_SIZE;
   const m = SIZE_RE.exec(s);
@@ -131,8 +141,9 @@ export function parseImageConfig(env: ImageGenEnv): ImageGenConfig | null {
   }
   /* The key travels in a header; plaintext would put it on the wire. */
   if (url.protocol !== "https:") return null;
-  const size = validSize(env.AI_IMAGE_SIZE);
-  if (!size) return null;
+  const omitSize = env.AI_IMAGE_SIZE?.trim().toLowerCase() === OMIT_SIZE;
+  const size = omitSize ? null : validSize(env.AI_IMAGE_SIZE);
+  if (!omitSize && !size) return null;
   return {
     url: `${base.replace(/\/+$/, "")}/images/generations`,
     model,
@@ -162,8 +173,8 @@ export function diagnoseImageConfig(env: ImageGenEnv): string[] {
       problems.push("AI_IMAGE_BASE_URL ends with /images/generations — the adapter appends that itself, so it is duplicated");
     }
   }
-  if (env.AI_IMAGE_SIZE?.trim() && !validSize(env.AI_IMAGE_SIZE)) {
-    problems.push("AI_IMAGE_SIZE must look like 1024x1024, each side 256–2048");
+  if (env.AI_IMAGE_SIZE?.trim() && env.AI_IMAGE_SIZE.trim().toLowerCase() !== OMIT_SIZE && !validSize(env.AI_IMAGE_SIZE)) {
+    problems.push("AI_IMAGE_SIZE must look like 1024x1024 (each side 256–2048) or the literal \"none\" to omit the field entirely");
   }
   if (problems.length === 0) {
     problems.push(
@@ -284,7 +295,7 @@ export async function generateImage(prompt: string, deps: ImageGenDeps): Promise
       model: cfg.model,
       prompt: text,
       n: 1,
-      size: cfg.size,
+      ...(cfg.size ? { size: cfg.size } : {}),
       response_format: "b64_json",
     };
     let res: Response;
