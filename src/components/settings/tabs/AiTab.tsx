@@ -37,6 +37,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { useTranslation, type Lang } from "@/lib/i18n";
+import { invalidateCachedGet } from "@/lib/client-cache";
 import { settingsT } from "@/lib/translations/settings";
 import { KOLEEX_MODEL_INFO, type KoleexServingModel } from "@/lib/ai/koleex-models";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
@@ -330,6 +331,10 @@ function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lan
         body: JSON.stringify({ key: `ai_model_off_${id}`, value: !on }),
       });
       if (!res.ok) throw new Error(String(res.status));
+      /* The shell batch holds platform-settings for a minute — flip the
+         switch without invalidating and the floating AI bars keep the OLD
+         value for up to 60 s (lib/client-cache). */
+      invalidateCachedGet("/api/platform-settings");
       setRows((cur) => (Array.isArray(cur) ? cur.map((r) => (r.id === id ? { ...r, off: !on } : r)) : cur));
     } catch {
       setFailed(true);
@@ -350,6 +355,7 @@ function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lan
         body: JSON.stringify({ key: "ai_read_page_off", value: !on }),
       });
       if (!res.ok) throw new Error(String(res.status));
+      invalidateCachedGet("/api/platform-settings");
       setReadPage((cur) => (cur ? { ...cur, off: !on } : cur));
     } catch {
       setFailed(true);

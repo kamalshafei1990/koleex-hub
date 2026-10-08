@@ -158,6 +158,12 @@ function invalidateTaxonomyCache(): void {
   inflight.delete("divisions");
   inflight.delete("categories");
   inflight.delete("subcategories");
+  /* The mirror is only HALF the cache: /api/taxonomy/all is also held for
+     60 s by cachedGet's catalog batch (lib/client-cache). Editing a
+     division and then reopening the catalogue used to serve the OLD list
+     from that layer until the TTL expired. Fire-and-forget — the import is
+     already warm wherever this module runs. */
+  void import("@/lib/client-cache").then((m) => m.invalidateCachedGet("/api/taxonomy/all"));
 }
 
 async function memoFetch<T>(key: string, loader: () => Promise<T>): Promise<T> {

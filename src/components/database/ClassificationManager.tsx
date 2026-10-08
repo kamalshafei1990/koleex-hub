@@ -28,6 +28,7 @@ import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { getKindsForSubcategory } from "@/lib/machine-kinds";
+import { invalidateCachedGet } from "@/lib/client-cache";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import { GENERAL_ICON_CATEGORIES, fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import {
@@ -267,6 +268,10 @@ export default function ClassificationManager() {
         body: JSON.stringify({ level: HUB_LEVEL[pLevel], slug, icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
       });
       if (!r.ok) showToast(t("vl.class.iconSaveFail", "Couldn't save the icon. Please try again."), "error");
+      /* The icons ride the catalog batch's 60 s cache — without this, the
+         product rail keeps showing the OLD icon for up to a minute after
+         a reassignment (lib/client-cache). */
+      else invalidateCachedGet("/api/classification-icons");
     } catch {
       showToast(t("vl.class.iconSaveNetwork", "Couldn't save the icon — network error. Please try again."), "error");
     } finally {

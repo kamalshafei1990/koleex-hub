@@ -14,11 +14,19 @@
    session.
    --------------------------------------------------------------------------- */
 
+import { cachedGet, invalidateCachedGet } from "@/lib/client-cache";
+
+/* Session-cached through the Hub's ONE reference-data layer
+   (lib/client-cache, measured 2026-10-08): the launcher state used to be
+   re-fetched on EVERY home mount — fetchFavorites and fetchRecent each
+   called getState, and StrictMode doubled it again: 2-4 China→Tokyo
+   round-trips (~700-900 ms each) for two small arrays that change only
+   when the user (un)favorites or opens an app. Now one fetch per 60 s
+   window, and every successful write below invalidates so the next read
+   is fresh where it matters. */
 async function getState(): Promise<{ favorites: string[]; recent: string[] }> {
   try {
-    const res = await fetch("/api/app-launcher", { credentials: "include", cache: "no-store" });
-    if (!res.ok) return { favorites: [], recent: [] };
-    const json = (await res.json()) as { favorites?: string[]; recent?: string[] };
+    const json = await cachedGet<{ favorites?: string[]; recent?: string[] }>("/api/app-launcher", 60_000);
     return { favorites: Array.isArray(json.favorites) ? json.favorites : [], recent: Array.isArray(json.recent) ? json.recent : [] };
   } catch { return { favorites: [], recent: [] }; }
 }
@@ -30,6 +38,9 @@ async function post(action: string, appId: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, app_id: appId }),
     });
+    /* The state just changed server-side — the cache must not serve the
+       pre-write arrays to the next reader (e.g. home after opening an app). */
+    if (res.ok) invalidateCachedGet("/api/app-launcher");
     return res.ok;
   } catch { return false; }
 }
