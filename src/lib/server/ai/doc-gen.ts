@@ -24,6 +24,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { launchPdfBrowser } from "../pdf/chromium";
+import { TAJAWAL_REGULAR_B64, TAJAWAL_BOLD_B64, NOTO_SANS_SC_REGULAR_B64 } from "./assets/doc-fonts";
 
 /* A4 render + snapshot budget. The quotation route budgets 35 s for the
    page and 8 s for the snapshot against a 60 s function ceiling; a
@@ -150,10 +151,27 @@ function dirFor(lang: string | undefined): "rtl" | "ltr" {
   return lang === "ar" ? "rtl" : "ltr";
 }
 
+/* The fonts ride INSIDE the HTML (see assets/doc-fonts.ts): serverless
+   Chromium has no Arabic and no CJK glyphs of its own — the owner's first
+   live Arabic PDF came back with the Arabic invisible. Tajawal is always
+   embedded (small) so Arabic renders even inside an English document;
+   Noto Sans SC is embedded only for lang=zh (4.7 MB), where bold is
+   synthesized from Regular. */
+function fontFaceBlock(lang: string | undefined): string {
+  const tajawal = `
+  @font-face { font-family: "Tajawal"; font-weight: 400; src: url("data:font/ttf;base64,${TAJAWAL_REGULAR_B64}") format("truetype"); }
+  @font-face { font-family: "Tajawal"; font-weight: 700; src: url("data:font/ttf;base64,${TAJAWAL_BOLD_B64}") format("truetype"); }`;
+  const noto = lang === "zh" ? `
+  @font-face { font-family: "Noto Sans SC"; font-weight: 400; src: url("data:font/otf;base64,${NOTO_SANS_SC_REGULAR_B64}") format("opentype"); }` : "";
+  return tajawal + noto;
+}
+
 function fontStackFor(lang: string | undefined): string {
-  if (lang === "ar") return `"Segoe UI", "Tahoma", "Arial", sans-serif`;
-  if (lang === "zh") return `"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`;
-  return `"Helvetica Neue", "Helvetica", "Arial", sans-serif`;
+  if (lang === "ar") return `"Tajawal", "Segoe UI", "Tahoma", "Arial", sans-serif`;
+  if (lang === "zh") return `"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
+  /* Latin-first stack with Tajawal behind it: Arabic words inside an
+     English document fall back per-glyph and still render. */
+  return `"Helvetica Neue", "Helvetica", "Arial", "Tajawal", sans-serif`;
 }
 
 /** The whole document as one self-contained HTML page. No external
@@ -187,7 +205,7 @@ export function renderDocHtml(doc: DocInput): string {
 <html lang="${esc(doc.lang ?? "en")}" dir="${dir}">
 <head>
 <meta charset="utf-8">
-<style>
+<style>${fontFaceBlock(doc.lang)}
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }

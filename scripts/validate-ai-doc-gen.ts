@@ -75,7 +75,13 @@ async function main() {
     check("no external asset is ever referenced (no render can hang on a fetch)",
       !/src="http|href="http|@import|url\(http/.test(good));
     const ar = renderDocHtml(sanitizeDocInput({ title: "ت", lang: "ar", sections: [{ paragraphs: ["x"] }] })!);
-    check("lang=ar flips direction and picks an Arabic-capable stack", ar.includes('dir="rtl"') && ar.includes("Tahoma"));
+    check("lang=ar flips direction and carries the embedded Arabic font",
+      ar.includes('dir="rtl"') && ar.includes('@font-face') && ar.includes('font-family: "Tajawal"'));
+    const zh = renderDocHtml(sanitizeDocInput({ title: "题", lang: "zh", sections: [{ paragraphs: ["x"] }] })!);
+    check("lang=zh embeds Noto Sans SC", zh.includes("Noto Sans SC"));
+    const en = renderDocHtml(sanitizeDocInput({ title: "T", lang: "en", sections: [{ paragraphs: ["x"] }] })!);
+    check("lang=en embeds Tajawal (mixed-language safety) but not the 5 MB CJK font",
+      en.includes("Tajawal") && !en.includes("Noto Sans SC"));
     check("the printed page is opaque white (headless transparency composites to black)",
       good.includes("background: #fff"));
   }
