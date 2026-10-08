@@ -2761,52 +2761,6 @@ export default function ProductList() {
     return () => ro.disconnect();
   }, [aurora, railVisible, subView, filterSub]);
 
-  /* SMART RAIL v2 (owner, 2026-10-08, second brief): NOT a fold-away — the
-     strip must SHRINK as the page scrolls, 1:1 with the finger, the way the
-     DeepSeek header morphs into a compact capsule ("you make them
-     disappeared, not start to become smaller"). So the scroll position is
-     mapped to a progress p (0 = full rail, 1 = mini chip row) and written
-     straight to a CSS variable on the nav — zero React renders, the motion
-     is the scroll. Two mechanics make this safe:
-       · `overflow-anchor: none` on the scroller (globals.css) — shrinking
-         the in-flow strip MUST not pull scrollTop back, or p feeds itself
-         and oscillates (the v1 binary fold looped exactly like that).
-       · The wrapper's height is a px lerp between the measured full and
-         mini heights, while the big tiles fade/lift out and the mini chips
-         fade in — it shrinks, it never vanishes. */
-  const navRef = useRef<HTMLElement | null>(null);
-  const railBigRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!railVisible) return;
-    const scroller = document.getElementById("main-scroll-container");
-    const nav = navRef.current;
-    if (!scroller || !nav) return;
-    let raf = 0;
-    const apply = () => {
-      raf = 0;
-      /* 24px of slack before the morph starts, 150px of travel to finish
-         it — short enough to feel tied to the finger, long enough to read
-         as a shrink, not a snap. */
-      const p = Math.min(1, Math.max(0, (scroller.scrollTop - 24) / 150));
-      nav.style.setProperty("--kx-rail-p", p.toFixed(3));
-      nav.toggleAttribute("data-rail-mini", p > 0.6);
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
-    /* Measure the two end heights: the mini row is one line (~40px), the
-       full block is whatever the tiles + shelf currently need (shelf open
-       or not, phone or desktop) — ResizeObserver keeps it honest. */
-    const measure = () => {
-      const big = railBigRef.current;
-      if (big) nav.style.setProperty("--kx-rail-h-full", `${big.scrollHeight}px`);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (railBigRef.current) ro.observe(railBigRef.current);
-    apply();
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => { scroller.removeEventListener("scroll", onScroll); ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
-  }, [railVisible]);
-
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
      Filters badge + ACTIVE chips row + "Showing X" line made the page
@@ -3512,7 +3466,6 @@ export default function ProductList() {
                --kx-ramp-fade is a LENGTH, not the default 45%: a
                percentage grows with the layer once it covers the strip. */
             className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
-            ref={navRef}
             /* The two numbers the strip cannot live without, and that the
                rail rewrite dropped for a day: the sticky offset is the
                MEASURED toolbar height (density resizes the search field),
@@ -3526,49 +3479,6 @@ export default function ProductList() {
             {/* The screen's ONE progressive edge: four masked layers
                 ramp 3→28px, stretched over the whole top strip. */}
             <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
-            {/* SMART RAIL v2 — the strip SHRINKS with the scroll, it never
-                disappears (owner, second brief: "the motion not match with
-                the scrolling… you make them disappeared not start to become
-                smaller"). .kx-rail-full's height is a px lerp between the
-                measured full block and the one-line mini row, driven by
-                --kx-rail-p which the scroll listener writes straight onto
-                this nav. The big block and the mini row share one grid
-                cell; p fades/lifts the big tiles out and the mini chips in.
-                The mini row stays fully functional — same press, same
-                filter — so the owner keeps the category switch even at the
-                bottom of the catalogue. */}
-            <div className="kx-rail-full">
-            <div className="kx-rail-stack">
-            <div className="kx-rail-mini" aria-hidden="false">
-              <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
-                {[{ slug: "", name: t("list.allProducts", "All products"), count: categoryNav.total }, ...categoryNav.list].map((c) => {
-                  const on = filterCat === c.slug;
-                  const coreOn = on && !aurora;
-                  return (
-                    <button
-                      key={c.slug || "__all"}
-                      type="button"
-                      aria-pressed={on}
-                      /* visibility (globals.css) already takes the hidden
-                         layer out of the tab order — no tabIndex needed. */
-                      onClick={() => { setFilterCat(c.slug); setFilterSub(""); pressRail(); }}
-                      className={`relative inline-flex items-center gap-1.5 h-8 ps-2.5 pe-2 rounded-lg border whitespace-nowrap select-none text-[12px] font-medium shrink-0 transition-colors ${
-                        coreOn
-                          ? "bg-[var(--bg-inverted)] border-transparent text-[var(--text-inverted)]"
-                          : `kx-glass bg-[var(--bg-card)] border-white/[0.06] ${on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`
-                      }`}
-                    >
-                      {c.slug !== "" && classIcons.category?.[c.slug]
-                        ? <ClassMonoIcon src={classIcons.category[c.slug]} className="h-3.5 w-3.5 shrink-0" />
-                        : <LayoutGridIcon className="h-3.5 w-3.5 shrink-0 opacity-90" />}
-                      <span>{c.name}</span>
-                      <span className={`px-1 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"}`}>{c.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="kx-rail-big" ref={railBigRef}>
             {/* SQUARE CATEGORY CARDS THAT FILTER (owner, 22 Sep 2026,
                 picked from five samples). The row used to be anchor tiles
                 that scrolled to a section of the grouped grid; now each
@@ -3738,9 +3648,6 @@ export default function ProductList() {
                 </div>
               )}
             </Collapse>
-            </div>
-            </div>
-            </div>
           </nav>
         )}
         {loadError === "__auth__" ? (
